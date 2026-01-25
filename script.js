@@ -108,7 +108,7 @@ const showImage = () => {
 };
 
 const finishGame = () => {
-    setMessage(`Valmis! Lopputulos: ${score}/${order.length}.`, "good");
+    setMessage(`Valmis! Pisteet: ${score}/${order.length}.`, "good");
     guessImage.src = order[order.length - 1]?.src ?? "";
     locked = true;
     updateTimer();
