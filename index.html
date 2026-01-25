@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="fi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nuottien tunnistaminen</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="header">
+        <h1>Nuottien tunnistaminen</h1>
+      </header>
+
+      <section class="game">
+        <div class="image-frame" aria-live="polite">
+          <img id="guess-image" src="" alt="Arvaa nuotti" />
+        </div>
+        <div class="status">
+          <div class="status-row">
+            <span>Kuva</span>
+            <strong id="progress">0 / 0</strong>
+          </div>
+          <div class="status-row">
+            <span>Oikein</span>
+            <strong id="score">0</strong>
+          </div>
+          <div class="status-row">
+            <span>Väärin</span>
+            <strong id="mistakes">0</strong>
+          </div>
+          <div class="status-row">
+            <span>Aika</span>
+            <strong id="timer">00:00</strong>
+          </div>
+        </div>
+        <div id="message" class="message">Kirjoita nuotin nimi aloittaaksesi.</div>
+        <button id="restart" class="button" type="button">Aloita uudestaan</button>
+      </section>
+    </main>
+
+    <script src="script.js"></script>
+  </body>
+</html>
