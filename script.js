@@ -267,10 +267,14 @@ const themeLabel = document.getElementById("theme-label");
 function buildThemeMenu() {
   themeMenu.replaceChildren();
   for (const [groupLabel, groupId] of [["Vaalea", "light"], ["Tumma", "dark"]]) {
+    const section = document.createElement("div");
+    section.className = "theme-menu-section";
+    section.dataset.group = groupId;
+
     const header = document.createElement("div");
     header.className = "theme-menu-group";
     header.textContent = groupLabel;
-    themeMenu.appendChild(header);
+    section.appendChild(header);
 
     for (const t of THEMES.filter((t) => t.group === groupId)) {
       const btn = document.createElement("button");
@@ -284,8 +288,9 @@ function buildThemeMenu() {
       btn.appendChild(swatch);
 
       btn.appendChild(document.createTextNode(t.label));
-      themeMenu.appendChild(btn);
+      section.appendChild(btn);
     }
+    themeMenu.appendChild(section);
   }
 }
 

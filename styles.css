@@ -284,7 +284,7 @@ body {
   background: var(--card-bg);
   border: 1px solid var(--card-border);
   border-radius: 10px;
-  padding: 6px;
+  padding: 4px;
   box-shadow: 0 8px 24px var(--card-shadow);
   z-index: 100;
   min-width: 170px;
@@ -295,13 +295,37 @@ body {
   display: block;
 }
 
+.theme-menu-section {
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.theme-menu-section[data-group="light"] {
+  background: #f0ebe4;
+}
+
+.theme-menu-section[data-group="dark"] {
+  background: #2c2c34;
+}
+
+.theme-menu-section + .theme-menu-section {
+  margin-top: 4px;
+}
+
 .theme-menu-group {
   padding: 4px 8px 2px;
   font-size: 0.65rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--status-label);
+}
+
+.theme-menu-section[data-group="light"] .theme-menu-group {
+  color: #8a7e70;
+}
+
+.theme-menu-section[data-group="dark"] .theme-menu-group {
+  color: #9a96a0;
 }
 
 .theme-menu-item {
@@ -316,25 +340,50 @@ body {
   cursor: pointer;
   font-family: inherit;
   font-size: 0.82rem;
-  color: var(--text);
   transition: background 0.15s ease;
 }
 
-.theme-menu-item:hover {
-  background: var(--status-bg);
+.theme-menu-section[data-group="light"] .theme-menu-item {
+  color: #3a3530;
+}
+
+.theme-menu-section[data-group="dark"] .theme-menu-item {
+  color: #e0ddd8;
+}
+
+.theme-menu-section[data-group="light"] .theme-menu-item:hover {
+  background: #e6ddd1;
+}
+
+.theme-menu-section[data-group="dark"] .theme-menu-item:hover {
+  background: #3a3a44;
 }
 
 .theme-menu-item.active {
-  background: var(--notation-bg);
   font-weight: 600;
+}
+
+.theme-menu-section[data-group="light"] .theme-menu-item.active {
+  background: #ddd5c8;
+}
+
+.theme-menu-section[data-group="dark"] .theme-menu-item.active {
+  background: #40404a;
 }
 
 .theme-menu-item .swatch {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  border: 1.5px solid var(--toggle-border);
   flex-shrink: 0;
+}
+
+.theme-menu-section[data-group="light"] .theme-menu-item .swatch {
+  border: 1.5px solid #c8bfb0;
+}
+
+.theme-menu-section[data-group="dark"] .theme-menu-item .swatch {
+  border: 1.5px solid #555560;
 }
 
 .game {
