@@ -5,22 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Nuottien tunnistaminen</title>
     <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/vexflow@4.2.5/build/cjs/vexflow.js" integrity="sha384-hTp5EB4x3B2hpyg2cOUxiLQjsEiWr0zbn6ABKZvaJm4hMThks7+F9ruInnkC3Vse" crossorigin="anonymous"></script>
   </head>
   <body>
     <main class="app">
-      <header class="header">
-        <h1>Nuottien tunnistaminen</h1>
-      </header>
+      <div class="toolbar">
+        <div class="theme-picker" id="theme-picker">
+          <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Vaihda teema">
+            <span class="swatch" id="theme-swatch"></span>
+            <span id="theme-label"></span>
+            <span class="chevron">▼</span>
+          </button>
+          <div class="theme-menu" id="theme-menu" role="listbox"></div>
+        </div>
+      </div>
 
       <section class="game">
-        <div class="image-frame" aria-live="polite">
-          <img id="guess-image" src="" alt="Arvaa nuotti" />
-        </div>
+        <div class="notation-area" id="notation" aria-live="polite"></div>
         <div class="status">
-          <div class="status-row">
-            <span>Nuotti</span>
-            <strong id="progress">0 / 0</strong>
-          </div>
           <div class="status-row">
             <span>Oikein</span>
             <strong id="score">0</strong>
@@ -30,12 +32,10 @@
             <strong id="mistakes">0</strong>
           </div>
           <div class="status-row">
-            <span>Aika</span>
-            <strong id="timer">00:00</strong>
+            <span>Putki</span>
+            <strong id="streak">0</strong>
           </div>
         </div>
-        <div id="message" class="message">Kirjoita nuotin nimi aloittaaksesi.</div>
-        <button id="restart" class="button" type="button">Aloita uudestaan</button>
       </section>
     </main>
 

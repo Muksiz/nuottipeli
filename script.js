@@ -1,199 +1,333 @@
-const imageFiles = [
-    "image/a.avif",
-    "image/a1.avif",
-    "image/a2.avif",
-    "image/c1.avif",
-    "image/c2.avif",
-    "image/c3.avif",
-    "image/d1.avif",
-    "image/d2.avif",
-    "image/e1.avif",
-    "image/e2.avif",
-    "image/f1.avif",
-    "image/f2.avif",
-    "image/g.avif",
-    "image/g1.avif",
-    "image/g2.avif",
-    "image/h.avif",
-    "image/h1.avif",
-    "image/h2.avif",
-];
+const { Renderer, Stave, StaveNote, Voice, Formatter } = Vex.Flow;
 
-const images = imageFiles.map((src) => {
-    const file = src.split("/").pop() ?? "";
-    const stem = file.split(".")[0] ?? "";
-    const answer = stem.replace(/\d+$/u, "").toLowerCase();
-    return { src, answer };
-});
-
-const guessImage = document.getElementById("guess-image");
-const imageFrame = document.querySelector(".image-frame");
-const progress = document.getElementById("progress");
-const scoreEl = document.getElementById("score");
-const mistakesEl = document.getElementById("mistakes");
-const timerEl = document.getElementById("timer");
-const messageEl = document.getElementById("message");
-const restartBtn = document.getElementById("restart");
-
-let order = [];
-let currentIndex = 0;
-let score = 0;
-let mistakes = 0;
-let attemptsForImage = 0;
-let locked = false;
-let startTime = 0;
-let timerStarted = false;
-
-const shuffle = (list) => {
-    const array = [...list];
-    for (let i = array.length - 1; i > 0; i -= 1) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
-    }
-    return array;
+// --- Piano audio synthesis ---
+const NOTE_FREQUENCIES = {
+  "g/3": 196.0,
+  "a/3": 220.0,
+  "b/3": 246.94,
+  "c/4": 261.63,
+  "d/4": 293.66,
+  "e/4": 329.63,
+  "f/4": 349.23,
+  "g/4": 392.0,
+  "a/4": 440.0,
+  "b/4": 493.88,
+  "c/5": 523.25,
+  "d/5": 587.33,
+  "e/5": 659.26,
+  "f/5": 698.46,
+  "g/5": 783.99,
+  "a/5": 880.0,
+  "b/5": 987.77,
+  "c/6": 1046.5,
 };
 
-const setMessage = (text, tone = "neutral") => {
-    messageEl.textContent = text;
-    messageEl.style.color =
-        tone === "good" ? "#8bffb0" : tone === "bad" ? "#ff9a9a" : "#f5f7ff";
-};
+let audioCtx = null;
 
-const triggerFeedback = (type) => {
-    if (!imageFrame) return;
-    imageFrame.classList.remove("anim-correct", "anim-wrong");
-    void imageFrame.offsetWidth;
-    imageFrame.classList.add(
-        type === "correct" ? "anim-correct" : "anim-wrong",
-    );
-};
-
-if (imageFrame) {
-    imageFrame.addEventListener("animationend", () => {
-        imageFrame.classList.remove("anim-correct", "anim-wrong");
-    });
+function getAudioContext() {
+  if (!audioCtx) audioCtx = new AudioContext();
+  return audioCtx;
 }
 
-const formatTime = (ms) => {
-    const totalSeconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-};
+function playPianoNote(noteKey, duration = 1.2) {
+  const freq = NOTE_FREQUENCIES[noteKey];
+  if (!freq) return;
 
-const updateTimer = () => {
-    if (!timerEl) return;
-    const elapsed = timerStarted ? Date.now() - startTime : 0;
-    timerEl.textContent = formatTime(elapsed);
-};
+  const ctx = getAudioContext();
+  const now = ctx.currentTime;
 
-const startTimer = () => {
-    if (timerStarted) return;
-    timerStarted = true;
-    startTime = Date.now();
-};
+  const harmonics = [
+    { ratio: 1, gain: 0.4 },
+    { ratio: 2, gain: 0.15 },
+    { ratio: 3, gain: 0.06 },
+    { ratio: 4, gain: 0.03 },
+  ];
 
-const updateStatus = () => {
-    progress.textContent = `${Math.min(currentIndex + 1, order.length)} / ${order.length}`;
-    scoreEl.textContent = String(score);
-    mistakesEl.textContent = String(mistakes);
-};
+  const master = ctx.createGain();
+  master.gain.setValueAtTime(0.5, now);
+  master.connect(ctx.destination);
 
-const showImage = () => {
-    const item = order[currentIndex];
-    if (!item) return;
-    guessImage.src = item.src;
-    guessImage.alt = "Arvaa nuotti";
-    updateStatus();
-};
+  for (const h of harmonics) {
+    const osc = ctx.createOscillator();
+    const env = ctx.createGain();
 
-const finishGame = () => {
-    setMessage(`Valmis! Pisteet: ${score}/${order.length}.`, "good");
-    guessImage.src = order[order.length - 1]?.src ?? "";
-    locked = true;
-    updateTimer();
-    timerStarted = false;
-};
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(freq * h.ratio, now);
 
-const handleGuess = (key) => {
-    if (locked) return;
+    env.gain.setValueAtTime(h.gain, now);
+    env.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
-    const item = order[currentIndex];
-    if (!item) return;
+    osc.connect(env);
+    env.connect(master);
+    osc.start(now);
+    osc.stop(now + duration);
+  }
+}
 
-    startTimer();
+function playErrorTone(duration = 0.35) {
+  const ctx = getAudioContext();
+  const now = ctx.currentTime;
 
-    const isCorrect =
-        key === item.answer || (item.answer === "h" && key === "b");
+  const master = ctx.createGain();
+  master.gain.setValueAtTime(0.18, now);
+  master.gain.exponentialRampToValueAtTime(0.001, now + duration);
+  master.connect(ctx.destination);
 
-    // After 3 failed attempts, ignore ALL wrong keys.
-    // Still allow the correct key so the user can progress.
-    if (attemptsForImage >= 3 && !isCorrect) {
-        return;
+  for (const freq of [185, 196]) {
+    const osc = ctx.createOscillator();
+    osc.type = "sawtooth";
+    osc.frequency.setValueAtTime(freq, now);
+    osc.connect(master);
+    osc.start(now);
+    osc.stop(now + duration);
+  }
+}
+
+const NOTE_POOL = [
+  { key: "g/3", name: "g" },
+  { key: "a/3", name: "a" },
+  { key: "b/3", name: "h" },
+  { key: "c/4", name: "c" },
+  { key: "d/4", name: "d" },
+  { key: "e/4", name: "e" },
+  { key: "f/4", name: "f" },
+  { key: "g/4", name: "g" },
+  { key: "a/4", name: "a" },
+  { key: "b/4", name: "h" },
+  { key: "c/5", name: "c" },
+  { key: "d/5", name: "d" },
+  { key: "e/5", name: "e" },
+  { key: "f/5", name: "f" },
+  { key: "g/5", name: "g" },
+  { key: "a/5", name: "a" },
+  { key: "b/5", name: "h" },
+  { key: "c/6", name: "c" },
+];
+
+const CONTEXT_BEHIND = 2;
+
+const notationEl = document.getElementById("notation");
+const scoreEl = document.getElementById("score");
+const mistakesEl = document.getElementById("mistakes");
+const streakEl = document.getElementById("streak");
+
+let allNotes = [];
+let currentIndex = 0;
+let correct = 0;
+let wrong = 0;
+let streak = 0;
+
+function randomNote() {
+  return NOTE_POOL[Math.floor(Math.random() * NOTE_POOL.length)];
+}
+
+function ensureBuffer(upTo) {
+  while (allNotes.length <= upTo) {
+    allNotes.push(randomNote());
+  }
+}
+
+function getVisibleCount() {
+  const width = notationEl.clientWidth || 700;
+  return Math.max(5, Math.min(12, Math.floor((width - 80) / 55)));
+}
+
+function renderNotation() {
+  const visibleCount = getVisibleCount();
+  const windowStart = Math.max(0, currentIndex - CONTEXT_BEHIND);
+  const windowEnd = windowStart + visibleCount;
+  ensureBuffer(windowEnd - 1);
+
+  const visibleNotes = allNotes.slice(windowStart, windowEnd);
+  const currentPos = currentIndex - windowStart;
+
+  notationEl.innerHTML = "";
+
+  const width = notationEl.clientWidth || 700;
+  const height = 180;
+
+  const renderer = new Renderer(notationEl, Renderer.Backends.SVG);
+  renderer.resize(width, height);
+  const context = renderer.getContext();
+
+  const styles = getComputedStyle(document.documentElement);
+  const staffColor = styles.getPropertyValue("--staff-color").trim();
+  context.setFillStyle(staffColor);
+  context.setStrokeStyle(staffColor);
+
+  const staveWidth = width - 20;
+  const stave = new Stave(10, 30, staveWidth);
+  stave.addClef("treble");
+  stave.setContext(context).draw();
+
+  const staveNotes = visibleNotes.map((note, i) => {
+    const octave = parseInt(note.key.split("/")[1], 10);
+    const letter = note.key[0];
+    const stemDown = octave >= 5 || (octave === 4 && letter === "b");
+    const sn = new StaveNote({
+      keys: [note.key],
+      duration: "q",
+      stem_direction: stemDown ? -1 : 1,
+    });
+
+    let color;
+    if (i < currentPos) {
+      color = styles.getPropertyValue("--note-past").trim();
+    } else if (i === currentPos) {
+      color = styles.getPropertyValue("--note-current").trim();
+    } else {
+      color = styles.getPropertyValue("--note-future").trim();
     }
 
-    if (isCorrect) {
-        // Only count as "Oikein" if the user got it BEFORE the answer was revealed.
-        if (attemptsForImage < 3) {
-            score += 1;
-        }
+    sn.setStyle({ fillStyle: color, strokeStyle: color });
+    return sn;
+  });
 
-        setMessage("Oikein!", "good");
-        triggerFeedback("correct");
-        currentIndex += 1;
-        attemptsForImage = 0;
+  const voice = new Voice({ num_beats: visibleNotes.length, beat_value: 4 });
+  voice.addTickables(staveNotes);
+  new Formatter().joinVoices([voice]).format([voice], staveWidth - 70);
+  voice.draw(context, stave);
+}
 
-        if (currentIndex >= order.length) {
-            finishGame();
-            updateStatus();
-            return;
-        }
+function triggerFeedback(type) {
+  notationEl.classList.remove("anim-correct", "anim-wrong");
+  void notationEl.offsetWidth;
+  notationEl.classList.add(type === "correct" ? "anim-correct" : "anim-wrong");
+}
 
-        showImage();
-        return;
-    }
-
-    // Wrong (only possible here when attemptsForImage < 3)
-    attemptsForImage += 1;
-    triggerFeedback("wrong");
-
-    // Count ONE mistake only when the 3rd attempt is used.
-    if (attemptsForImage === 3) {
-        mistakes += 1;
-        setMessage(`Vastaus: ${item.answer.toUpperCase()}.`, "bad");
-        updateStatus();
-        return;
-    }
-
-    setMessage("Ei oikein, yritä uudestaan.", "bad");
-    updateStatus();
-};
-
-const startGame = () => {
-    const round = shuffle(images);
-    order = [...round, ...round];
-    currentIndex = 0;
-    score = 0;
-    mistakes = 0;
-    attemptsForImage = 0;
-    locked = false;
-    timerStarted = false;
-    startTime = 0;
-
-    if (timerEl) {
-        timerEl.textContent = "--:--";
-    }
-
-    setMessage("Kirjoita nuotin nimi aloittaaksesi.");
-    showImage();
-};
-
-window.addEventListener("keydown", (event) => {
-    const key = event.key.toLowerCase();
-    if (!/^[a-z]$/.test(key)) return;
-    handleGuess(key);
+notationEl.addEventListener("animationend", () => {
+  notationEl.classList.remove("anim-correct", "anim-wrong");
 });
 
-restartBtn.addEventListener("click", startGame);
+function updateStatus() {
+  scoreEl.textContent = String(correct);
+  mistakesEl.textContent = String(wrong);
+  streakEl.textContent = String(streak);
+}
+
+function handleGuess(key) {
+  const note = allNotes[currentIndex];
+  if (!note) return;
+
+  const isCorrect = key === note.name || (note.name === "h" && key === "b");
+
+  if (isCorrect) {
+    playPianoNote(note.key);
+    correct += 1;
+    streak += 1;
+    currentIndex += 1;
+    triggerFeedback("correct");
+    renderNotation();
+    updateStatus();
+  } else {
+    playErrorTone();
+    wrong += 1;
+    streak = 0;
+    triggerFeedback("wrong");
+    updateStatus();
+  }
+}
+
+function startGame() {
+  allNotes = [];
+  currentIndex = 0;
+  correct = 0;
+  wrong = 0;
+  streak = 0;
+  renderNotation();
+  updateStatus();
+}
+
+window.addEventListener("keydown", (event) => {
+  const key = event.key.toLowerCase();
+  if (!/^[a-z]$/.test(key)) return;
+  handleGuess(key);
+});
+
+window.addEventListener("resize", () => {
+  renderNotation();
+});
+
+const THEMES = [
+  { id: "parchment", label: "Pergamentti", color: "#f4ede4", group: "light" },
+  { id: "arctic", label: "Arktinen", color: "#f7fafd", group: "light" },
+  { id: "sakura", label: "Sakura", color: "#fdf5f8", group: "light" },
+  { id: "meadow", label: "Niitty", color: "#f5faf4", group: "light" },
+  { id: "espresso", label: "Espresso", color: "#2a2520", group: "dark" },
+  { id: "midnight", label: "Yö", color: "#1a2238", group: "dark" },
+  { id: "nord", label: "Nord", color: "#3b4252", group: "dark" },
+  { id: "forest", label: "Metsä", color: "#1e2a20", group: "dark" },
+];
+
+const themeToggle = document.getElementById("theme-toggle");
+const themeMenu = document.getElementById("theme-menu");
+const themeSwatch = document.getElementById("theme-swatch");
+const themeLabel = document.getElementById("theme-label");
+
+function buildThemeMenu() {
+  themeMenu.replaceChildren();
+  for (const [groupLabel, groupId] of [["Vaalea", "light"], ["Tumma", "dark"]]) {
+    const header = document.createElement("div");
+    header.className = "theme-menu-group";
+    header.textContent = groupLabel;
+    themeMenu.appendChild(header);
+
+    for (const t of THEMES.filter((t) => t.group === groupId)) {
+      const btn = document.createElement("button");
+      btn.className = "theme-menu-item";
+      btn.dataset.theme = t.id;
+      btn.setAttribute("role", "option");
+
+      const swatch = document.createElement("span");
+      swatch.className = "swatch";
+      swatch.style.background = t.color;
+      btn.appendChild(swatch);
+
+      btn.appendChild(document.createTextNode(t.label));
+      themeMenu.appendChild(btn);
+    }
+  }
+}
+
+function applyTheme(themeId) {
+  const theme = THEMES.find((t) => t.id === themeId) || THEMES[0];
+  document.documentElement.setAttribute("data-theme", theme.id);
+  themeSwatch.style.background = theme.color;
+  themeLabel.textContent = theme.label;
+  themeMenu.querySelectorAll(".theme-menu-item").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.theme === theme.id);
+  });
+  renderNotation();
+}
+
+buildThemeMenu();
+
+const savedTheme = localStorage.getItem("theme");
+const initialTheme =
+  savedTheme === "dark"
+    ? "espresso"
+    : THEMES.find((t) => t.id === savedTheme)
+      ? savedTheme
+      : "parchment";
+applyTheme(initialTheme);
+
+themeToggle.addEventListener("click", () => {
+  themeMenu.classList.toggle("open");
+});
+
+themeMenu.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-theme]");
+  if (!btn) return;
+  const id = btn.dataset.theme;
+  localStorage.setItem("theme", id);
+  applyTheme(id);
+  themeMenu.classList.remove("open");
+});
+
+document.addEventListener("click", (e) => {
+  if (!e.target.closest("#theme-picker")) {
+    themeMenu.classList.remove("open");
+  }
+});
 
 startGame();
