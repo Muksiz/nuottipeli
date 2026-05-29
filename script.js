@@ -359,12 +359,9 @@ window.addEventListener("resize", () => {
 const THEMES = [
   { id: "parchment", label: "Pergamentti", color: "#f4ede4", group: "light" },
   { id: "arctic", label: "Arktinen", color: "#f7fafd", group: "light" },
-  { id: "sakura", label: "Sakura", color: "#fdf5f8", group: "light" },
-  { id: "meadow", label: "Niitty", color: "#f5faf4", group: "light" },
-  { id: "espresso", label: "Espresso", color: "#2a2520", group: "dark" },
+  { id: "espresso", label: "Espresso", color: "#271d14", group: "dark" },
   { id: "midnight", label: "Yö", color: "#1a2238", group: "dark" },
   { id: "nord", label: "Nord", color: "#3b4252", group: "dark" },
-  { id: "forest", label: "Metsä", color: "#1e2a20", group: "dark" },
 ];
 
 const themeToggle = document.getElementById("theme-toggle");
