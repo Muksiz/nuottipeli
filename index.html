@@ -20,7 +20,14 @@
         </div>
       </div>
 
-      <section class="game">
+      <section class="screen setup-screen" id="setup-screen">
+        <h1 class="screen-title">Montako nuottia?</h1>
+        <p class="screen-subtitle">Valitse nuottien määrä.</p>
+        <div class="note-count-options" id="note-count-options"></div>
+      </section>
+
+      <section class="screen game" id="game-screen" hidden>
+        <div class="progress" id="progress"></div>
         <div class="notation-area" id="notation" aria-live="polite"></div>
         <div class="status">
           <div class="status-row">
@@ -36,6 +43,13 @@
             <strong id="streak">0</strong>
           </div>
         </div>
+      </section>
+
+      <section class="screen results-screen" id="results-screen" hidden>
+        <h1 class="screen-title">Peli ohi!</h1>
+        <div class="results-stats" id="results-stats"></div>
+        <button type="button" class="primary-btn" id="play-again">Pelaa uudelleen</button>
+        <p class="screen-hint">Paina <kbd>Tab</kbd> pelataksesi uudelleen samalla nuottimäärällä.</p>
       </section>
     </main>
 

@@ -17,7 +17,7 @@
   --staff-color: #6b5e50;
   --note-past: #7a9e7e;
   --note-current: #b86a3e;
-  --note-future: rgba(107, 94, 80, 0.28);
+  --note-future: rgba(107, 94, 80, 0.65);
   --text: #3a3530;
   --pop-glow: rgba(122, 158, 126, 0.3);
   --toggle-bg: #e6ddd1;
@@ -41,7 +41,7 @@
   --staff-color: #5a7a94;
   --note-past: #6ea8d4;
   --note-current: #d45d5d;
-  --note-future: rgba(90, 122, 148, 0.25);
+  --note-future: rgba(90, 122, 148, 0.65);
   --text: #2c3e50;
   --pop-glow: rgba(110, 168, 212, 0.3);
   --toggle-bg: #e4edf6;
@@ -65,7 +65,7 @@
   --staff-color: #8a6070;
   --note-past: #c47a98;
   --note-current: #c45d3e;
-  --note-future: rgba(138, 96, 112, 0.25);
+  --note-future: rgba(138, 96, 112, 0.65);
   --text: #4a2e3a;
   --pop-glow: rgba(196, 122, 152, 0.3);
   --toggle-bg: #f3e2ea;
@@ -89,7 +89,7 @@
   --staff-color: #5a7a58;
   --note-past: #7aaa78;
   --note-current: #c87a30;
-  --note-future: rgba(90, 122, 88, 0.25);
+  --note-future: rgba(90, 122, 88, 0.65);
   --text: #2a3e2a;
   --pop-glow: rgba(122, 170, 120, 0.3);
   --toggle-bg: #e0eddf;
@@ -113,7 +113,7 @@
   --staff-color: #a89882;
   --note-past: #8ab48e;
   --note-current: #d4834e;
-  --note-future: rgba(168, 152, 130, 0.22);
+  --note-future: rgba(168, 152, 130, 0.75);
   --text: #e8dfd4;
   --pop-glow: rgba(122, 158, 126, 0.2);
   --toggle-bg: #312b25;
@@ -137,7 +137,7 @@
   --staff-color: #8098c0;
   --note-past: #5a8ad4;
   --note-current: #e0884a;
-  --note-future: rgba(112, 136, 176, 0.22);
+  --note-future: rgba(112, 136, 176, 0.75);
   --text: #d0daf0;
   --pop-glow: rgba(90, 138, 212, 0.2);
   --toggle-bg: #1e2a44;
@@ -161,7 +161,7 @@
   --staff-color: #a0aec0;
   --note-past: #88c0d0;
   --note-current: #bf616a;
-  --note-future: rgba(160, 174, 192, 0.22);
+  --note-future: rgba(160, 174, 192, 0.75);
   --text: #eceff4;
   --pop-glow: rgba(136, 192, 208, 0.2);
   --toggle-bg: #434c5e;
@@ -185,7 +185,7 @@
   --staff-color: #8ab88c;
   --note-past: #6ab86e;
   --note-current: #d4a44e;
-  --note-future: rgba(120, 160, 122, 0.22);
+  --note-future: rgba(120, 160, 122, 0.75);
   --text: #d4e8d6;
   --pop-glow: rgba(106, 184, 110, 0.2);
   --toggle-bg: #26342a;
@@ -386,10 +386,117 @@ body {
   border: 1.5px solid #555560;
 }
 
+.screen[hidden] {
+  display: none;
+}
+
 .game {
   display: grid;
   gap: 24px;
   justify-items: center;
+}
+
+.progress {
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: 1.1rem;
+  letter-spacing: 0.02em;
+  color: var(--status-value);
+}
+
+.setup-screen,
+.results-screen {
+  display: grid;
+  gap: 20px;
+  justify-items: center;
+  text-align: center;
+  padding: 24px 8px 16px;
+}
+
+.screen-title {
+  margin: 0;
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: 2rem;
+  color: var(--status-value);
+}
+
+.screen-subtitle {
+  margin: -12px 0 0;
+  color: var(--status-label);
+  font-size: 0.95rem;
+}
+
+.note-count-options {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  width: 100%;
+}
+
+.note-count-btn {
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: 1.15rem;
+  background: var(--toggle-bg);
+  border: 1px solid var(--toggle-border);
+  color: var(--status-value);
+  padding: 14px 0;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.12s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.note-count-btn:hover {
+  transform: translateY(-2px);
+  border-color: var(--note-current);
+  color: var(--note-current);
+}
+
+.note-count-btn:active {
+  transform: translateY(0);
+}
+
+.results-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  width: 100%;
+}
+
+.primary-btn {
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 0.95rem;
+  padding: 12px 24px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: var(--note-current);
+  color: #fff;
+  cursor: pointer;
+  transition: transform 0.12s ease, opacity 0.15s ease;
+}
+
+.primary-btn:hover {
+  transform: translateY(-2px);
+  opacity: 0.92;
+}
+
+.primary-btn:active {
+  transform: translateY(0);
+}
+
+.screen-hint {
+  margin: 0;
+  color: var(--status-label);
+  font-size: 0.85rem;
+}
+
+.screen-hint kbd {
+  font-family: inherit;
+  font-size: 0.78rem;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: var(--toggle-bg);
+  border: 1px solid var(--toggle-border);
+  color: var(--toggle-text);
 }
 
 .notation-area {
@@ -495,7 +602,12 @@ body {
     padding: 12px 18px 20px;
   }
 
-  .status {
+  .status,
+  .results-stats {
     grid-template-columns: 1fr;
+  }
+
+  .note-count-options {
+    grid-template-columns: repeat(3, 1fr);
   }
 }

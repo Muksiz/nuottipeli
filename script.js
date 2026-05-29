@@ -104,18 +104,27 @@ const NOTE_POOL = [
   { key: "c/6", name: "c" },
 ];
 
-const CONTEXT_BEHIND = 2;
-
 const notationEl = document.getElementById("notation");
 const scoreEl = document.getElementById("score");
 const mistakesEl = document.getElementById("mistakes");
 const streakEl = document.getElementById("streak");
+const progressEl = document.getElementById("progress");
+const setupScreen = document.getElementById("setup-screen");
+const gameScreen = document.getElementById("game-screen");
+const resultsScreen = document.getElementById("results-screen");
+const noteCountOptionsEl = document.getElementById("note-count-options");
+const resultsStatsEl = document.getElementById("results-stats");
+const playAgainBtn = document.getElementById("play-again");
+
+const NOTE_COUNT_PRESETS = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
 
 let allNotes = [];
 let currentIndex = 0;
 let correct = 0;
 let wrong = 0;
 let streak = 0;
+let totalNotes = 0;
+let gameActive = false;
 
 function randomNote() {
   return NOTE_POOL[Math.floor(Math.random() * NOTE_POOL.length)];
@@ -132,10 +141,20 @@ function getVisibleCount() {
   return Math.max(5, Math.min(12, Math.floor((width - 80) / 55)));
 }
 
+// Notes are shown one "line" (page) at a time. The player works through the
+// whole line, and only when every note on it has been answered does the next
+// line appear. getPageStart snaps the absolute index of the current note down
+// to the start of its page, so the visible window jumps a full line at a time
+// instead of scrolling one note at a time.
+function getPageStart(index, pageSize) {
+  return Math.floor(index / pageSize) * pageSize;
+}
+
 function renderNotation() {
-  const visibleCount = getVisibleCount();
-  const windowStart = Math.max(0, currentIndex - CONTEXT_BEHIND);
-  const windowEnd = windowStart + visibleCount;
+  const pageSize = getVisibleCount();
+  const windowStart = getPageStart(currentIndex, pageSize);
+  let windowEnd = windowStart + pageSize;
+  if (totalNotes > 0) windowEnd = Math.min(windowEnd, totalNotes);
   ensureBuffer(windowEnd - 1);
 
   const visibleNotes = allNotes.slice(windowStart, windowEnd);
@@ -152,12 +171,21 @@ function renderNotation() {
 
   const styles = getComputedStyle(document.documentElement);
   const staffColor = styles.getPropertyValue("--staff-color").trim();
+  const ledgerColor = styles.getPropertyValue("--text").trim();
   context.setFillStyle(staffColor);
   context.setStrokeStyle(staffColor);
 
   const staveWidth = width - 20;
   const stave = new Stave(10, 30, staveWidth);
   stave.addClef("treble");
+  // Ledger lines default to a fixed dark grey (#444) that vanishes on dark
+  // themes. The muted staff color was still too faint for these short
+  // segments, so use the high-contrast text ink and a bolder stroke.
+  stave.setDefaultLedgerLineStyle({
+    strokeStyle: ledgerColor,
+    fillStyle: ledgerColor,
+    lineWidth: 2,
+  });
   stave.setContext(context).draw();
 
   const staveNotes = visibleNotes.map((note, i) => {
@@ -183,10 +211,12 @@ function renderNotation() {
     return sn;
   });
 
-  const voice = new Voice({ num_beats: visibleNotes.length, beat_value: 4 });
-  voice.addTickables(staveNotes);
-  new Formatter().joinVoices([voice]).format([voice], staveWidth - 70);
-  voice.draw(context, stave);
+  if (staveNotes.length > 0) {
+    const voice = new Voice({ num_beats: visibleNotes.length, beat_value: 4 });
+    voice.addTickables(staveNotes);
+    new Formatter().joinVoices([voice]).format([voice], staveWidth - 70);
+    voice.draw(context, stave);
+  }
 }
 
 function triggerFeedback(type) {
@@ -203,9 +233,13 @@ function updateStatus() {
   scoreEl.textContent = String(correct);
   mistakesEl.textContent = String(wrong);
   streakEl.textContent = String(streak);
+  const noteNumber = Math.min(currentIndex + 1, totalNotes);
+  progressEl.textContent = `Nuotti ${noteNumber} / ${totalNotes}`;
 }
 
 function handleGuess(key) {
+  if (!gameActive) return;
+
   const note = allNotes[currentIndex];
   if (!note) return;
 
@@ -217,8 +251,12 @@ function handleGuess(key) {
     streak += 1;
     currentIndex += 1;
     triggerFeedback("correct");
-    renderNotation();
     updateStatus();
+    if (currentIndex >= totalNotes) {
+      endGame();
+    } else {
+      renderNotation();
+    }
   } else {
     playErrorTone();
     wrong += 1;
@@ -238,11 +276,81 @@ function startGame() {
   updateStatus();
 }
 
+function buildNoteCountOptions() {
+  noteCountOptionsEl.replaceChildren();
+  for (const n of NOTE_COUNT_PRESETS) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "note-count-btn";
+    btn.dataset.count = String(n);
+    btn.textContent = String(n);
+    noteCountOptionsEl.appendChild(btn);
+  }
+}
+
+function showScreen(screen) {
+  for (const s of [setupScreen, gameScreen, resultsScreen]) {
+    s.hidden = s !== screen;
+  }
+}
+
+function showSetup() {
+  gameActive = false;
+  showScreen(setupScreen);
+}
+
+function beginGame(noteCount) {
+  totalNotes = noteCount;
+  showScreen(gameScreen);
+  startGame();
+  gameActive = true;
+}
+
+function endGame() {
+  gameActive = false;
+
+  const total = correct + wrong;
+  const accuracy = total > 0 ? Math.round((correct / total) * 100) : 0;
+  const stats = [
+    ["Oikein", correct],
+    ["Väärin", wrong],
+    ["Tarkkuus", `${accuracy} %`],
+  ];
+
+  resultsStatsEl.replaceChildren();
+  for (const [label, value] of stats) {
+    const row = document.createElement("div");
+    row.className = "status-row";
+    const span = document.createElement("span");
+    span.textContent = label;
+    const strong = document.createElement("strong");
+    strong.textContent = String(value);
+    row.append(span, strong);
+    resultsStatsEl.appendChild(row);
+  }
+
+  showScreen(resultsScreen);
+}
+
 window.addEventListener("keydown", (event) => {
+  // On the results screen, Tab quickly replays the same number of notes.
+  if (event.key === "Tab" && !resultsScreen.hidden) {
+    event.preventDefault();
+    beginGame(totalNotes);
+    return;
+  }
   const key = event.key.toLowerCase();
   if (!/^[a-z]$/.test(key)) return;
   handleGuess(key);
 });
+
+noteCountOptionsEl.addEventListener("click", (event) => {
+  const btn = event.target.closest("[data-count]");
+  if (!btn) return;
+  beginGame(Number(btn.dataset.count));
+});
+
+playAgainBtn.addEventListener("click", showSetup);
 
 window.addEventListener("resize", () => {
   renderNotation();
@@ -335,4 +443,5 @@ document.addEventListener("click", (e) => {
   }
 });
 
-startGame();
+buildNoteCountOptions();
+showSetup();
