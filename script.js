@@ -156,6 +156,7 @@ const gameScreen = document.getElementById("game-screen");
 const resultsScreen = document.getElementById("results-screen");
 const noteCountOptionsEl = document.getElementById("note-count-options");
 const resultsStatsEl = document.getElementById("results-stats");
+const resultsFaceEl = document.getElementById("results-face");
 const playAgainBtn = document.getElementById("play-again");
 const notePadEl = document.getElementById("note-pad");
 
@@ -379,11 +380,59 @@ function beginGame(noteCount) {
   gameActive = true;
 }
 
+// The closing face reacts to how clean the round was. Accuracy is the right
+// signal here: since a note can't be passed until it's answered correctly, the
+// only thing that varies is how many wrong guesses it took. These two
+// thresholds are the dial — raise FACE_HAPPY_MIN to make a smile harder to
+// earn, or lower FACE_SAD_MAX to be more forgiving before a frown.
+const FACE_HAPPY_MIN = 90; // accuracy % at or above this -> happy
+const FACE_SAD_MAX = 70; //   accuracy % below this -> sad
+
+function faceForAccuracy(accuracy) {
+  if (accuracy >= FACE_HAPPY_MIN) return "happy";
+  if (accuracy < FACE_SAD_MAX) return "sad";
+  return "neutral";
+}
+
+// Mouth paths share the same eyes/outline; only the curve changes. A smile
+// bows down at the corners (control point below), a frown bows up, neutral is
+// a flat line.
+const FACE_MOUTHS = {
+  happy: "M33 58 Q50 76 67 58",
+  neutral: "M35 64 H65",
+  sad: "M33 70 Q50 54 67 70",
+};
+
+const SVG_NS = "http://www.w3.org/2000/svg";
+
+function svgEl(tag, attrs) {
+  const el = document.createElementNS(SVG_NS, tag);
+  for (const [key, value] of Object.entries(attrs)) {
+    el.setAttribute(key, value);
+  }
+  return el;
+}
+
+function renderResultsFace(accuracy) {
+  const mood = faceForAccuracy(accuracy);
+  resultsFaceEl.className = `results-face face-${mood}`;
+
+  const svg = svgEl("svg", { viewBox: "0 0 100 100", role: "img" });
+  svg.append(
+    svgEl("circle", { class: "face-outline", cx: 50, cy: 50, r: 44 }),
+    svgEl("circle", { class: "eye", cx: 37, cy: 42, r: 5 }),
+    svgEl("circle", { class: "eye", cx: 63, cy: 42, r: 5 }),
+    svgEl("path", { class: "mouth", d: FACE_MOUTHS[mood] }),
+  );
+  resultsFaceEl.replaceChildren(svg);
+}
+
 function endGame() {
   gameActive = false;
 
   const total = correct + wrong;
   const accuracy = total > 0 ? Math.round((correct / total) * 100) : 0;
+  renderResultsFace(accuracy);
   const stats = [
     ["Oikein", correct],
     ["Väärin", wrong],

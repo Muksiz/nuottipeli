@@ -595,12 +595,6 @@ body {
   color: var(--status-value);
 }
 
-.screen-subtitle {
-  margin: -12px 0 0;
-  color: var(--status-label);
-  font-size: 0.95rem;
-}
-
 .note-count-options {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -635,6 +629,65 @@ body {
   grid-template-columns: repeat(3, 1fr);
   gap: 12px;
   width: 100%;
+}
+
+/* Reaction face. The outline and mouth are stroked in the mood color (set per
+   .face-* below) via currentColor; the eyes are filled in the same ink. */
+.results-face {
+  animation: face-pop 0.4s ease both;
+}
+
+.results-face svg {
+  display: block;
+  width: 104px;
+  height: 104px;
+}
+
+.results-face .face-outline,
+.results-face .mouth {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 4;
+}
+
+.results-face .mouth {
+  stroke-linecap: round;
+}
+
+.results-face .eye {
+  fill: currentColor;
+}
+
+.results-face.face-happy {
+  color: var(--note-past);
+}
+
+.results-face.face-neutral {
+  color: var(--staff-color);
+}
+
+.results-face.face-sad {
+  color: var(--note-current);
+}
+
+@keyframes face-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.08);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .results-face {
+    animation: none;
+  }
 }
 
 .primary-btn {
