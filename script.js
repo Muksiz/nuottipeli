@@ -115,8 +115,11 @@ const resultsScreen = document.getElementById("results-screen");
 const noteCountOptionsEl = document.getElementById("note-count-options");
 const resultsStatsEl = document.getElementById("results-stats");
 const playAgainBtn = document.getElementById("play-again");
+const notePadEl = document.getElementById("note-pad");
 
 const NOTE_COUNT_PRESETS = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+// Note names for the on-screen answer pad (mobile), in scale order.
+const NOTE_PAD_KEYS = ["c", "d", "e", "f", "g", "a", "h"];
 
 let allNotes = [];
 let currentIndex = 0;
@@ -288,6 +291,19 @@ function buildNoteCountOptions() {
   }
 }
 
+function buildNotePad() {
+  if (!notePadEl) return;
+  notePadEl.replaceChildren();
+  for (const name of NOTE_PAD_KEYS) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "note-pad-btn";
+    btn.dataset.note = name;
+    btn.textContent = name.toUpperCase();
+    notePadEl.appendChild(btn);
+  }
+}
+
 function showScreen(screen) {
   for (const s of [setupScreen, gameScreen, resultsScreen]) {
     s.hidden = s !== screen;
@@ -351,6 +367,12 @@ noteCountOptionsEl.addEventListener("click", (event) => {
 });
 
 playAgainBtn.addEventListener("click", showSetup);
+
+notePadEl.addEventListener("click", (event) => {
+  const btn = event.target.closest("[data-note]");
+  if (!btn) return;
+  handleGuess(btn.dataset.note);
+});
 
 window.addEventListener("resize", () => {
   renderNotation();
@@ -441,6 +463,7 @@ document.addEventListener("click", (e) => {
 });
 
 buildNoteCountOptions();
+buildNotePad();
 showSetup();
 
 // --- Ambient background: rising note particles + pointer parallax ---

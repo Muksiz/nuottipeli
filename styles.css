@@ -726,3 +726,65 @@ body {
     grid-template-columns: repeat(3, 1fr);
   }
 }
+
+/* On-screen note answer buttons. Hidden by default and styled only inside the
+   touch-device query, so the keyboard-only desktop layout is untouched at any
+   window width. */
+.note-pad {
+  display: none;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  /* Compact status chips, leaving room for a bigger answer pad. */
+  .status {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .status-row {
+    padding: 6px 8px;
+    gap: 2px;
+  }
+
+  .status-row span {
+    font-size: 0.6rem;
+  }
+
+  .status-row strong {
+    font-size: 1rem;
+  }
+
+  .note-pad {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 8px;
+    width: 100%;
+  }
+
+  .note-pad-btn {
+    font-family: "DM Serif Display", Georgia, serif;
+    font-size: 1.55rem;
+    min-height: 72px;
+    padding: 0;
+    background: var(--toggle-bg);
+    border: 1px solid var(--toggle-border);
+    color: var(--status-value);
+    border-radius: 10px;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.12s ease, transform 0.08s ease, border-color 0.12s ease, color 0.12s ease;
+  }
+
+  .note-pad-btn:active {
+    transform: translateY(1px) scale(0.97);
+    background: var(--status-bg);
+    border-color: var(--note-current);
+    color: var(--note-current);
+  }
+
+  /* The "press Tab" hint is meaningless without a keyboard. */
+  .screen-hint {
+    display: none;
+  }
+}
