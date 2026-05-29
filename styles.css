@@ -334,15 +334,17 @@ body {
 
 .toolbar {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   margin-bottom: 8px;
 }
 
-.theme-picker {
+.theme-picker,
+.clef-picker {
   position: relative;
 }
 
-.theme-toggle {
+.theme-toggle,
+.clef-toggle {
   background: var(--toggle-bg);
   border: 1px solid var(--toggle-border);
   color: var(--toggle-text);
@@ -359,11 +361,13 @@ body {
   transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
 }
 
-.theme-toggle:hover {
+.theme-toggle:hover,
+.clef-toggle:hover {
   transform: translateY(-1px);
 }
 
-.theme-toggle:active {
+.theme-toggle:active,
+.clef-toggle:active {
   transform: translateY(0);
 }
 
@@ -375,10 +379,17 @@ body {
   flex-shrink: 0;
 }
 
-.theme-toggle .chevron {
+.theme-toggle .chevron,
+.clef-toggle .chevron {
   font-size: 0.6rem;
   opacity: 0.6;
   margin-left: 2px;
+}
+
+.clef-toggle .clef-glyph {
+  font-size: 1.15rem;
+  line-height: 1;
+  flex-shrink: 0;
 }
 
 .theme-menu {
@@ -489,6 +500,66 @@ body {
 
 .theme-menu-section[data-group="dark"] .theme-menu-item .swatch {
   border: 1.5px solid #555560;
+}
+
+/* The clef menu lists only two entries, so it skips the theme menu's
+   light/dark grouping and simply follows the active theme's colors. */
+.clef-menu {
+  display: none;
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 4px;
+  box-shadow: 0 8px 24px var(--card-shadow);
+  z-index: 100;
+  min-width: 150px;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.clef-menu.open {
+  display: block;
+}
+
+.clef-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  width: 100%;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.82rem;
+  color: var(--text);
+  transition: background 0.15s ease;
+}
+
+.clef-menu-item:hover {
+  background: var(--toggle-bg);
+}
+
+.clef-menu-item.active {
+  font-weight: 600;
+  background: var(--toggle-bg);
+}
+
+.clef-menu-item .clef-glyph {
+  font-size: 1.4rem;
+  line-height: 1;
+  width: 22px;
+  text-align: center;
+}
+
+.clef-empty-hint {
+  margin: 10px 0 0;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--note-future);
 }
 
 .screen[hidden] {
@@ -735,6 +806,26 @@ body {
 }
 
 @media (hover: none) and (pointer: coarse) {
+  /* Fit the game in a portrait viewport: tighter vertical spacing, and "safe"
+     centering so a layout taller than the screen aligns to the top and stays
+     scrollable instead of being clipped by flex centering. */
+  body {
+    align-items: safe center;
+    padding: 10px;
+  }
+
+  .toolbar {
+    margin-bottom: 4px;
+  }
+
+  .game {
+    gap: 14px;
+  }
+
+  .notation-area {
+    padding: 6px 0;
+  }
+
   /* Compact status chips, leaving room for a bigger answer pad. */
   .status {
     grid-template-columns: repeat(3, 1fr);

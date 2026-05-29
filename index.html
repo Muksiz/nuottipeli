@@ -18,6 +18,14 @@
     <div class="notes-layer" aria-hidden="true"></div>
     <main class="app">
       <div class="toolbar">
+        <div class="clef-picker" id="clef-picker">
+          <button id="clef-toggle" class="clef-toggle" type="button" aria-label="Vaihda nuottiavain">
+            <span class="clef-glyph" id="clef-glyph"></span>
+            <span id="clef-label"></span>
+            <span class="chevron">▼</span>
+          </button>
+          <div class="clef-menu" id="clef-menu" role="listbox"></div>
+        </div>
         <div class="theme-picker" id="theme-picker">
           <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Vaihda teema">
             <span class="swatch" id="theme-swatch"></span>

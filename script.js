@@ -1,26 +1,17 @@
 const { Renderer, Stave, StaveNote, Voice, Formatter } = Vex.Flow;
 
 // --- Piano audio synthesis ---
-const NOTE_FREQUENCIES = {
-  "g/3": 196.0,
-  "a/3": 220.0,
-  "b/3": 246.94,
-  "c/4": 261.63,
-  "d/4": 293.66,
-  "e/4": 329.63,
-  "f/4": 349.23,
-  "g/4": 392.0,
-  "a/4": 440.0,
-  "b/4": 493.88,
-  "c/5": 523.25,
-  "d/5": 587.33,
-  "e/5": 659.26,
-  "f/5": 698.46,
-  "g/5": 783.99,
-  "a/5": 880.0,
-  "b/5": 987.77,
-  "c/6": 1046.5,
-};
+// Frequencies are derived from the note key (e.g. "c/4") in equal temperament
+// rather than stored in a table, so any note added to any clef gets audio for
+// free. A4 ("a/4") = 440 Hz is the reference; each semitone multiplies by
+// 2^(1/12). MIDI note 69 is A4, which anchors the formula.
+const SEMITONE_FROM_C = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 };
+
+function noteFrequency(noteKey) {
+  const [letter, octaveStr] = noteKey.split("/");
+  const midi = (parseInt(octaveStr, 10) + 1) * 12 + SEMITONE_FROM_C[letter];
+  return 440 * 2 ** ((midi - 69) / 12);
+}
 
 let audioCtx = null;
 
@@ -30,8 +21,8 @@ function getAudioContext() {
 }
 
 function playPianoNote(noteKey, duration = 1.2) {
-  const freq = NOTE_FREQUENCIES[noteKey];
-  if (!freq) return;
+  const freq = noteFrequency(noteKey);
+  if (!Number.isFinite(freq)) return;
 
   const ctx = getAudioContext();
   const now = ctx.currentTime;
@@ -83,26 +74,77 @@ function playErrorTone(duration = 0.35) {
   }
 }
 
-const NOTE_POOL = [
-  { key: "g/3", name: "g" },
-  { key: "a/3", name: "a" },
-  { key: "b/3", name: "h" },
-  { key: "c/4", name: "c" },
-  { key: "d/4", name: "d" },
-  { key: "e/4", name: "e" },
-  { key: "f/4", name: "f" },
-  { key: "g/4", name: "g" },
-  { key: "a/4", name: "a" },
-  { key: "b/4", name: "h" },
-  { key: "c/5", name: "c" },
-  { key: "d/5", name: "d" },
-  { key: "e/5", name: "e" },
-  { key: "f/5", name: "f" },
-  { key: "g/5", name: "g" },
-  { key: "a/5", name: "a" },
-  { key: "b/5", name: "h" },
-  { key: "c/6", name: "c" },
+// --- Clefs ---
+// Each note key maps to a rung on the diatonic ladder (7 letters per octave).
+// diatonicStep turns "c/4" into an absolute rung number, so we can ask "is this
+// note at or above the clef's middle line?" — the rule that decides stem
+// direction, independent of which clef is showing.
+const LETTER_STEP = { c: 0, d: 1, e: 2, f: 3, g: 4, a: 5, b: 6 };
+
+function diatonicStep(noteKey) {
+  const [letter, octaveStr] = noteKey.split("/");
+  return parseInt(octaveStr, 10) * 7 + LETTER_STEP[letter];
+}
+
+const CLEFS = [
+  {
+    id: "treble",
+    label: "G-avain",
+    glyph: "𝄞",
+    // The middle (3rd) staff line is B4. Notes at or above it stem downward.
+    middleLine: "b/4",
+    notePool: [
+      { key: "g/3", name: "g" },
+      { key: "a/3", name: "a" },
+      { key: "b/3", name: "h" },
+      { key: "c/4", name: "c" },
+      { key: "d/4", name: "d" },
+      { key: "e/4", name: "e" },
+      { key: "f/4", name: "f" },
+      { key: "g/4", name: "g" },
+      { key: "a/4", name: "a" },
+      { key: "b/4", name: "h" },
+      { key: "c/5", name: "c" },
+      { key: "d/5", name: "d" },
+      { key: "e/5", name: "e" },
+      { key: "f/5", name: "f" },
+      { key: "g/5", name: "g" },
+      { key: "a/5", name: "a" },
+      { key: "b/5", name: "h" },
+      { key: "c/6", name: "c" },
+    ],
+  },
+  {
+    id: "bass",
+    label: "F-avain",
+    glyph: "𝄢",
+    // The middle (3rd) staff line of the bass clef is D3.
+    middleLine: "d/3",
+    // Kept in range of the staff: from e/2 (one ledger line below) up through
+    // e/4 (two ledger lines above), passing middle C (c/4) on the first ledger
+    // line above. Leans slightly upward, where bass-clef reading actually
+    // lives, rather than diving into the rarely-read low ledger notes.
+    notePool: [
+      { key: "e/2", name: "e" },
+      { key: "f/2", name: "f" },
+      { key: "g/2", name: "g" },
+      { key: "a/2", name: "a" },
+      { key: "b/2", name: "h" },
+      { key: "c/3", name: "c" },
+      { key: "d/3", name: "d" },
+      { key: "e/3", name: "e" },
+      { key: "f/3", name: "f" },
+      { key: "g/3", name: "g" },
+      { key: "a/3", name: "a" },
+      { key: "b/3", name: "h" },
+      { key: "c/4", name: "c" },
+      { key: "d/4", name: "d" },
+      { key: "e/4", name: "e" },
+    ],
+  },
 ];
+
+let currentClef = CLEFS[0];
 
 const notationEl = document.getElementById("notation");
 const scoreEl = document.getElementById("score");
@@ -130,10 +172,13 @@ let totalNotes = 0;
 let gameActive = false;
 
 function randomNote() {
-  return NOTE_POOL[Math.floor(Math.random() * NOTE_POOL.length)];
+  const pool = currentClef.notePool;
+  return pool[Math.floor(Math.random() * pool.length)];
 }
 
 function ensureBuffer(upTo) {
+  // Nothing to draw until the active clef has notes defined.
+  if (currentClef.notePool.length === 0) return;
   while (allNotes.length <= upTo) {
     allNotes.push(randomNote());
   }
@@ -180,7 +225,7 @@ function renderNotation() {
 
   const staveWidth = width - 20;
   const stave = new Stave(10, 30, staveWidth);
-  stave.addClef("treble");
+  stave.addClef(currentClef.id);
   // Ledger lines default to a fixed dark grey (#444) that vanishes on dark
   // themes. The muted staff color was still too faint for these short
   // segments, so use the high-contrast text ink and a bolder stroke.
@@ -191,13 +236,25 @@ function renderNotation() {
   });
   stave.setContext(context).draw();
 
+  // The clef is drawn, but there are no notes to place yet (e.g. an unfilled
+  // pool). Show a gentle hint instead of an empty staff.
+  if (currentClef.notePool.length === 0) {
+    const hint = document.createElement("p");
+    hint.className = "clef-empty-hint";
+    hint.textContent = "Lisää tämän avaimen nuotit (CLEFS, script.js).";
+    notationEl.appendChild(hint);
+    return;
+  }
+
   const staveNotes = visibleNotes.map((note, i) => {
-    const octave = parseInt(note.key.split("/")[1], 10);
-    const letter = note.key[0];
-    const stemDown = octave >= 5 || (octave === 4 && letter === "b");
+    // Notes sitting at or above the clef's middle line get a downward stem.
+    const stemDown = diatonicStep(note.key) >= diatonicStep(currentClef.middleLine);
     const sn = new StaveNote({
       keys: [note.key],
       duration: "q",
+      // Without this the note positions itself for the treble clef regardless
+      // of the glyph drawn on the stave, sinking bass notes ~2 octaves too low.
+      clef: currentClef.id,
       stem_direction: stemDown ? -1 : 1,
     });
 
@@ -459,6 +516,70 @@ themeMenu.addEventListener("click", (e) => {
 document.addEventListener("click", (e) => {
   if (!e.target.closest("#theme-picker")) {
     themeMenu.classList.remove("open");
+  }
+});
+
+// --- Clef picker (mirrors the theme picker, anchored top-left) ---
+const clefToggle = document.getElementById("clef-toggle");
+const clefMenu = document.getElementById("clef-menu");
+const clefGlyph = document.getElementById("clef-glyph");
+const clefLabel = document.getElementById("clef-label");
+
+function buildClefMenu() {
+  clefMenu.replaceChildren();
+  for (const c of CLEFS) {
+    const btn = document.createElement("button");
+    btn.className = "clef-menu-item";
+    btn.dataset.clef = c.id;
+    btn.setAttribute("role", "option");
+
+    const glyph = document.createElement("span");
+    glyph.className = "clef-glyph";
+    glyph.textContent = c.glyph;
+    btn.appendChild(glyph);
+
+    btn.appendChild(document.createTextNode(c.label));
+    clefMenu.appendChild(btn);
+  }
+}
+
+function applyClef(clefId) {
+  currentClef = CLEFS.find((c) => c.id === clefId) || CLEFS[0];
+  clefGlyph.textContent = currentClef.glyph;
+  clefLabel.textContent = currentClef.label;
+  clefMenu.querySelectorAll(".clef-menu-item").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.clef === currentClef.id);
+  });
+  // A single staff can only carry one clef, so switching mid-game would mix
+  // incompatible note positions — restart the round with the new clef instead.
+  if (gameActive) {
+    startGame();
+  } else {
+    renderNotation();
+  }
+}
+
+buildClefMenu();
+
+const savedClef = localStorage.getItem("clef");
+applyClef(CLEFS.find((c) => c.id === savedClef) ? savedClef : CLEFS[0].id);
+
+clefToggle.addEventListener("click", () => {
+  clefMenu.classList.toggle("open");
+});
+
+clefMenu.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-clef]");
+  if (!btn) return;
+  const id = btn.dataset.clef;
+  localStorage.setItem("clef", id);
+  applyClef(id);
+  clefMenu.classList.remove("open");
+});
+
+document.addEventListener("click", (e) => {
+  if (!e.target.closest("#clef-picker")) {
+    clefMenu.classList.remove("open");
   }
 });
 
