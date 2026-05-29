@@ -631,43 +631,11 @@ body {
   width: 100%;
 }
 
-/* Reaction face. The outline and mouth are stroked in the mood color (set per
-   .face-* below) via currentColor; the eyes are filled in the same ink. */
+/* Reaction emoji shown above the end-of-game stats. */
 .results-face {
+  font-size: 4.5rem;
+  line-height: 1;
   animation: face-pop 0.4s ease both;
-}
-
-.results-face svg {
-  display: block;
-  width: 104px;
-  height: 104px;
-}
-
-.results-face .face-outline,
-.results-face .mouth {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 4;
-}
-
-.results-face .mouth {
-  stroke-linecap: round;
-}
-
-.results-face .eye {
-  fill: currentColor;
-}
-
-.results-face.face-happy {
-  color: var(--note-past);
-}
-
-.results-face.face-neutral {
-  color: var(--staff-color);
-}
-
-.results-face.face-sad {
-  color: var(--note-current);
 }
 
 @keyframes face-pop {

@@ -115,6 +115,36 @@ const CLEFS = [
     ],
   },
   {
+    id: "alto",
+    label: "C-avain",
+    glyph: "𝄡",
+    // The middle (3rd) line of the alto (C) clef is middle C itself.
+    middleLine: "c/4",
+    // Mirrors the treble pool's geometry on the alto staff: 5 steps below the
+    // bottom line (F3) through 4 above the top line (G4), i.e. a/2 to d/5,
+    // centered on middle C with two ledger lines either side.
+    notePool: [
+      { key: "a/2", name: "a" },
+      { key: "b/2", name: "h" },
+      { key: "c/3", name: "c" },
+      { key: "d/3", name: "d" },
+      { key: "e/3", name: "e" },
+      { key: "f/3", name: "f" },
+      { key: "g/3", name: "g" },
+      { key: "a/3", name: "a" },
+      { key: "b/3", name: "h" },
+      { key: "c/4", name: "c" },
+      { key: "d/4", name: "d" },
+      { key: "e/4", name: "e" },
+      { key: "f/4", name: "f" },
+      { key: "g/4", name: "g" },
+      { key: "a/4", name: "a" },
+      { key: "b/4", name: "h" },
+      { key: "c/5", name: "c" },
+      { key: "d/5", name: "d" },
+    ],
+  },
+  {
     id: "bass",
     label: "F-avain",
     glyph: "𝄢",
@@ -380,51 +410,26 @@ function beginGame(noteCount) {
   gameActive = true;
 }
 
-// The closing face reacts to how clean the round was. Accuracy is the right
+// The closing emoji reacts to how clean the round was. Accuracy is the right
 // signal here: since a note can't be passed until it's answered correctly, the
-// only thing that varies is how many wrong guesses it took. These two
-// thresholds are the dial — raise FACE_HAPPY_MIN to make a smile harder to
-// earn, or lower FACE_SAD_MAX to be more forgiving before a frown.
-const FACE_HAPPY_MIN = 90; // accuracy % at or above this -> happy
-const FACE_SAD_MAX = 70; //   accuracy % below this -> sad
+// only thing that varies is how many wrong guesses it took. Tiers are checked
+// top-down — the first one whose `min` accuracy is reached wins — so keep them
+// ordered high to low. Tweak the thresholds or swap the emoji to taste.
+const FACE_TIERS = [
+  { min: 100, emoji: "🥳" }, // flawless
+  { min: 90, emoji: "😄" }, //  great
+  { min: 80, emoji: "🙂" }, //  good
+  { min: 70, emoji: "😐" }, //  neutral
+  { min: 55, emoji: "😕" }, //  shaky
+  { min: 0, emoji: "😢" }, //   rough
+];
 
 function faceForAccuracy(accuracy) {
-  if (accuracy >= FACE_HAPPY_MIN) return "happy";
-  if (accuracy < FACE_SAD_MAX) return "sad";
-  return "neutral";
-}
-
-// Mouth paths share the same eyes/outline; only the curve changes. A smile
-// bows down at the corners (control point below), a frown bows up, neutral is
-// a flat line.
-const FACE_MOUTHS = {
-  happy: "M33 58 Q50 76 67 58",
-  neutral: "M35 64 H65",
-  sad: "M33 70 Q50 54 67 70",
-};
-
-const SVG_NS = "http://www.w3.org/2000/svg";
-
-function svgEl(tag, attrs) {
-  const el = document.createElementNS(SVG_NS, tag);
-  for (const [key, value] of Object.entries(attrs)) {
-    el.setAttribute(key, value);
-  }
-  return el;
+  return FACE_TIERS.find((tier) => accuracy >= tier.min) ?? FACE_TIERS.at(-1);
 }
 
 function renderResultsFace(accuracy) {
-  const mood = faceForAccuracy(accuracy);
-  resultsFaceEl.className = `results-face face-${mood}`;
-
-  const svg = svgEl("svg", { viewBox: "0 0 100 100", role: "img" });
-  svg.append(
-    svgEl("circle", { class: "face-outline", cx: 50, cy: 50, r: 44 }),
-    svgEl("circle", { class: "eye", cx: 37, cy: 42, r: 5 }),
-    svgEl("circle", { class: "eye", cx: 63, cy: 42, r: 5 }),
-    svgEl("path", { class: "mouth", d: FACE_MOUTHS[mood] }),
-  );
-  resultsFaceEl.replaceChildren(svg);
+  resultsFaceEl.textContent = faceForAccuracy(accuracy).emoji;
 }
 
 function endGame() {
