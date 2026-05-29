@@ -442,3 +442,37 @@ document.addEventListener("click", (e) => {
 
 buildNoteCountOptions();
 showSetup();
+
+// --- Ambient background: rising note particles + pointer parallax ---
+const prefersReducedMotion = window.matchMedia(
+  "(prefers-reduced-motion: reduce)",
+).matches;
+
+function buildNoteParticles(count = 9) {
+  const layer = document.querySelector(".notes-layer");
+  if (!layer) return;
+  const glyphs = ["♪", "♫", "♩", "♬"];
+  for (let i = 0; i < count; i++) {
+    const el = document.createElement("span");
+    el.className = "note-particle";
+    el.textContent = glyphs[Math.floor(Math.random() * glyphs.length)];
+    el.style.setProperty("--x", `${Math.random() * 100}%`);
+    el.style.setProperty("--size", `${(1.2 + Math.random() * 2.2).toFixed(2)}rem`);
+    el.style.setProperty("--dur", `${(14 + Math.random() * 12).toFixed(1)}s`);
+    // Negative delay starts each note mid-flight, so the screen is never empty.
+    el.style.setProperty("--delay", `${(-Math.random() * 26).toFixed(1)}s`);
+    el.style.setProperty("--spin", `${Math.round(Math.random() * 80 - 40)}deg`);
+    el.style.setProperty("--peak", (0.1 + Math.random() * 0.12).toFixed(2));
+    layer.appendChild(el);
+  }
+}
+
+if (!prefersReducedMotion) {
+  buildNoteParticles();
+  window.addEventListener("pointermove", (event) => {
+    const x = (event.clientX / window.innerWidth - 0.5) * 2;
+    const y = (event.clientY / window.innerHeight - 0.5) * 2;
+    document.documentElement.style.setProperty("--px", x.toFixed(3));
+    document.documentElement.style.setProperty("--py", y.toFixed(3));
+  });
+}

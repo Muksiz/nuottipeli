@@ -131,9 +131,6 @@ body {
   margin: 0;
   font-family: "DM Sans", "Segoe UI", system-ui, sans-serif;
   background: var(--bg);
-  background-image:
-    radial-gradient(ellipse at 30% 0%, var(--bg-grad-1) 0%, transparent 60%),
-    radial-gradient(ellipse at 70% 100%, var(--bg-grad-2) 0%, transparent 50%);
   color: var(--text);
   min-height: 100vh;
   display: flex;
@@ -141,6 +138,186 @@ body {
   justify-content: center;
   padding: 24px;
   transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* Animated ambient background: layered, blended theme-colored glows that drift
+   behind the card and parallax with the pointer, plus a few rising note glyphs.
+   Colors come from the active theme's variables, so it re-themes itself. Only
+   transform/opacity animate (GPU compositor); mix-blend-mode adds the richness. */
+.bg,
+.notes-layer {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  /* Pointer parallax, fed from JS via --px/--py. The two layers move at
+     different rates and opposite directions to fake depth. The transform also
+     isolates the blob blend group into its own composited layer. */
+  transition: transform 0.6s ease-out;
+}
+
+.bg {
+  transform: translate(calc(var(--px, 0) * 22px), calc(var(--py, 0) * 22px));
+}
+
+.notes-layer {
+  transform: translate(calc(var(--px, 0) * -14px), calc(var(--py, 0) * -14px));
+}
+
+.blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(70px);
+  mix-blend-mode: var(--blob-blend, screen);
+  transition: background 0.3s ease;
+  will-change: transform;
+}
+
+/* Light themes read best with multiplied glows; dark themes glow additively. */
+:root {
+  --blob-blend: multiply;
+}
+
+[data-theme="espresso"],
+[data-theme="midnight"],
+[data-theme="nord"] {
+  --blob-blend: screen;
+}
+
+.blob-1 {
+  top: -20%;
+  left: -12%;
+  width: 60vw;
+  height: 60vw;
+  background: radial-gradient(circle at 50% 50%, var(--bg-grad-1), transparent 68%);
+  animation: drift-1 28s ease-in-out infinite;
+}
+
+.blob-2 {
+  right: -14%;
+  bottom: -22%;
+  width: 55vw;
+  height: 55vw;
+  background: radial-gradient(circle at 50% 50%, var(--bg-grad-2), transparent 68%);
+  animation: drift-2 36s ease-in-out infinite;
+}
+
+.blob-3 {
+  top: 22%;
+  left: 30%;
+  width: 42vw;
+  height: 42vw;
+  filter: blur(55px);
+  background: radial-gradient(circle at 50% 50%, var(--pop-glow), transparent 70%);
+  animation: drift-3 32s ease-in-out infinite;
+}
+
+.blob-4 {
+  top: -14%;
+  right: -10%;
+  width: 48vw;
+  height: 48vw;
+  filter: blur(85px);
+  background: radial-gradient(circle at 50% 50%, var(--bg-grad-2), transparent 70%);
+  animation: drift-4 44s ease-in-out infinite;
+}
+
+.blob-5 {
+  bottom: -16%;
+  left: -10%;
+  width: 50vw;
+  height: 50vw;
+  filter: blur(85px);
+  background: radial-gradient(circle at 50% 50%, var(--bg-grad-1), transparent 70%);
+  animation: drift-5 40s ease-in-out infinite;
+}
+
+@keyframes drift-1 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(18%, 12%) scale(1.18);
+  }
+}
+
+@keyframes drift-2 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1.1);
+  }
+  50% {
+    transform: translate(-16%, -10%) scale(0.92);
+  }
+}
+
+@keyframes drift-3 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+    opacity: 0.85;
+  }
+  33% {
+    transform: translate(14%, -12%) scale(1.22);
+    opacity: 1;
+  }
+  66% {
+    transform: translate(-12%, 8%) scale(0.9);
+    opacity: 0.7;
+  }
+}
+
+@keyframes drift-4 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1.05);
+  }
+  50% {
+    transform: translate(-14%, 14%) scale(0.9);
+  }
+}
+
+@keyframes drift-5 {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(0.95);
+  }
+  50% {
+    transform: translate(12%, -12%) scale(1.15);
+  }
+}
+
+/* Rising musical-note particles (built in JS with randomized x/size/speed). */
+.note-particle {
+  position: absolute;
+  bottom: -12%;
+  left: var(--x);
+  font-size: var(--size);
+  line-height: 1;
+  color: var(--note-current);
+  opacity: 0;
+  transition: color 0.3s ease;
+  will-change: transform, opacity;
+  animation: rise var(--dur) linear var(--delay) infinite;
+}
+
+@keyframes rise {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0;
+  }
+  12% {
+    opacity: var(--peak, 0.16);
+  }
+  88% {
+    opacity: var(--peak, 0.16);
+  }
+  100% {
+    transform: translateY(-118vh) rotate(var(--spin, 40deg));
+    opacity: 0;
+  }
 }
 
 .app {
@@ -522,6 +699,16 @@ body {
   .notation-area.anim-correct,
   .notation-area.anim-wrong {
     animation: none;
+  }
+
+  .blob,
+  .note-particle {
+    animation: none;
+  }
+
+  .bg,
+  .notes-layer {
+    transform: none;
   }
 }
 
