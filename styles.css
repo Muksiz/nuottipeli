@@ -416,9 +416,27 @@ body {
   display: none;
 }
 
+/* Kept in view while the dialog scrolls: the note-range rows below make it
+   tall enough that a footer would need scrolling to reach. */
+.app-settings-bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  justify-self: stretch;
+  margin: -18px -18px 0;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--card-bg);
+  border-radius: 14px 14px 0 0;
+  transition: background 0.2s ease;
+}
+
 .app-settings-cols {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: 18px;
   align-items: start;
   width: 100%;
@@ -443,16 +461,6 @@ body {
 .app-settings-done:hover {
   color: var(--note-current);
   border-color: var(--note-current);
-}
-
-.app-settings-heading {
-  margin: 0 0 4px;
-  padding: 0 4px;
-  font-size: 0.65rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--status-label);
 }
 
 .theme-menu {
@@ -550,13 +558,16 @@ body {
   border: 1.5px solid #555560;
 }
 
-/* The clef menu lists only two entries, so it skips the theme menu's
-   light/dark grouping and simply follows the active theme's colors. */
-.clef-menu {
+/* The clef and language menus are short flat lists, so they skip the theme
+   menu's light/dark grouping and simply follow the active theme's colors.
+   They share every rule below; only the leading glyph differs. */
+.clef-menu,
+.lang-menu {
   display: block;
 }
 
-.clef-menu-item {
+.clef-menu-item,
+.lang-menu-item {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -572,11 +583,13 @@ body {
   transition: background 0.15s ease;
 }
 
-.clef-menu-item:hover {
+.clef-menu-item:hover,
+.lang-menu-item:hover {
   background: var(--toggle-bg);
 }
 
-.clef-menu-item.active {
+.clef-menu-item.active,
+.lang-menu-item.active {
   font-weight: 600;
   background: var(--toggle-bg);
 }
@@ -586,6 +599,20 @@ body {
   line-height: 1;
   width: 26px;
   text-align: center;
+}
+
+.lang-menu-item .lang-code {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  width: 26px;
+  text-align: center;
+  color: var(--status-label);
+}
+
+.lang-menu-item.active .lang-code {
+  color: var(--note-current);
 }
 
 .clef-empty-hint {
@@ -668,11 +695,6 @@ body {
   font-size: 1.1rem;
 }
 
-.difficulty-hint {
-  font-size: 0.75rem;
-  color: var(--status-label);
-}
-
 .difficulty-btn:hover {
   transform: translateY(-2px);
   border-color: var(--note-current);
@@ -689,10 +711,6 @@ body {
   color: var(--note-current);
 }
 
-.difficulty-btn.active .difficulty-hint {
-  color: var(--note-current);
-}
-
 /* --- Note range settings --- */
 
 .settings-panel {
@@ -700,6 +718,9 @@ body {
   gap: 10px;
   justify-items: center;
   width: 100%;
+  /* No headings separate the sections any more, so the staves need a little
+     extra air above them to read as their own block. */
+  margin-top: 10px;
 }
 
 .settings-note {
@@ -720,23 +741,10 @@ body {
   width: 100%;
 }
 
-.range-row-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 10px;
-}
-
 .range-row-name {
   font-family: "DM Serif Display", Georgia, serif;
   font-size: 1rem;
   color: var(--status-value);
-}
-
-.range-row-span {
-  font-size: 0.8rem;
-  letter-spacing: 0.04em;
-  color: var(--note-current);
 }
 
 /* The VexFlow staff fills the row; the hit areas are absolutely positioned
@@ -1008,10 +1016,6 @@ body {
   .app-settings-cols {
     grid-template-columns: 1fr;
     gap: 12px;
-  }
-
-  .difficulty-hint {
-    font-size: 0.7rem;
   }
 
   .range-row-name {

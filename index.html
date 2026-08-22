@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Nuottien tunnistaminen</title>
+    <title data-i18n="app.title">Nuottien tunnistaminen</title>
     <link rel="stylesheet" href="styles.css" />
     <script src="https://cdn.jsdelivr.net/npm/vexflow@4.2.5/build/cjs/vexflow.js" integrity="sha384-hTp5EB4x3B2hpyg2cOUxiLQjsEiWr0zbn6ABKZvaJm4hMThks7+F9ruInnkC3Vse" crossorigin="anonymous"></script>
   </head>
@@ -24,11 +24,12 @@
             class="app-settings-toggle"
             type="button"
             aria-label="Asetukset"
+            data-i18n-aria="settings.title"
             aria-expanded="false"
             aria-controls="app-settings-menu"
           >
             <span class="gear" aria-hidden="true">⚙</span>
-            <span class="app-settings-text">Asetukset</span>
+            <span class="app-settings-text" data-i18n="settings.title">Asetukset</span>
           </button>
           <div class="app-settings-backdrop" id="app-settings-backdrop" hidden></div>
           <div
@@ -37,39 +38,79 @@
             role="dialog"
             aria-modal="true"
             aria-label="Asetukset"
+            data-i18n-aria="settings.title"
             hidden
           >
+            <div class="app-settings-bar">
+              <button
+                type="button"
+                class="settings-reset"
+                id="settings-reset"
+                data-i18n="settings.reset"
+              >
+                Palauta oletukset
+              </button>
+              <button
+                type="button"
+                class="app-settings-done"
+                id="app-settings-done"
+                data-i18n="settings.done"
+              >
+                Valmis
+              </button>
+            </div>
             <div class="app-settings-cols">
               <div class="app-settings-group">
-                <p class="app-settings-heading">Nuottiavain</p>
-                <div class="clef-menu" id="clef-menu" role="listbox"></div>
+                <div
+                  class="lang-menu"
+                  id="lang-menu"
+                  role="listbox"
+                  aria-label="Kieli"
+                  data-i18n-aria="settings.language"
+                ></div>
               </div>
               <div class="app-settings-group">
-                <p class="app-settings-heading">Teema</p>
-                <div class="theme-menu" id="theme-menu" role="listbox"></div>
+                <div
+                  class="clef-menu"
+                  id="clef-menu"
+                  role="listbox"
+                  aria-label="Nuottiavain"
+                  data-i18n-aria="settings.clef"
+                ></div>
+              </div>
+              <div class="app-settings-group">
+                <div
+                  class="theme-menu"
+                  id="theme-menu"
+                  role="listbox"
+                  aria-label="Teema"
+                  data-i18n-aria="settings.theme"
+                ></div>
               </div>
             </div>
             <div class="app-settings-group">
-              <p class="app-settings-heading">Nuottialueet</p>
-              <div class="settings-panel" id="settings-panel">
-                <p class="settings-note" id="settings-clef-note"></p>
+              <div
+                class="settings-panel"
+                id="settings-panel"
+                role="group"
+                aria-label="Nuottialueet"
+                data-i18n-aria="settings.ranges"
+              >
                 <div class="range-rows" id="range-rows"></div>
-                <button type="button" class="settings-reset" id="settings-reset">
-                  Palauta oletukset
-                </button>
               </div>
             </div>
-            <button type="button" class="app-settings-done" id="app-settings-done">
-              Valmis
-            </button>
           </div>
         </div>
       </div>
 
       <section class="screen setup-screen" id="setup-screen">
-        <h1 class="screen-title">Valitse vaikeustaso ja nuottien määrä.</h1>
+        <h1 class="screen-title" data-i18n="setup.title">
+          Valitse vaikeustaso ja nuottien määrä.
+        </h1>
         <div class="setup-group">
-          <p class="setup-label" id="difficulty-label">Vaikeustaso</p>
+          <p class="setup-label" id="difficulty-label" data-i18n="setup.difficulty">
+            Vaikeustaso
+          </p>
           <div
             class="difficulty-options"
             id="difficulty-options"
@@ -78,7 +119,9 @@
           ></div>
         </div>
         <div class="setup-group">
-          <p class="setup-label" id="note-count-label">Nuottien määrä</p>
+          <p class="setup-label" id="note-count-label" data-i18n="setup.noteCount">
+            Nuottien määrä
+          </p>
           <div
             class="note-count-options"
             id="note-count-options"
@@ -93,27 +136,45 @@
         <div class="notation-area" id="notation" aria-live="polite"></div>
         <div class="status">
           <div class="status-row">
-            <span>Oikein</span>
+            <span data-i18n="game.correct">Oikein</span>
             <strong id="score">0</strong>
           </div>
           <div class="status-row">
-            <span>Väärin</span>
+            <span data-i18n="game.wrong">Väärin</span>
             <strong id="mistakes">0</strong>
           </div>
           <div class="status-row">
-            <span>Putki</span>
+            <span data-i18n="game.streak">Putki</span>
             <strong id="streak">0</strong>
           </div>
         </div>
-        <div class="note-pad" id="note-pad" aria-label="Nuottipainikkeet"></div>
+        <div
+          class="note-pad"
+          id="note-pad"
+          aria-label="Nuottipainikkeet"
+          data-i18n-aria="game.notePad"
+        ></div>
       </section>
 
       <section class="screen results-screen" id="results-screen" hidden>
-        <h1 class="screen-title">Peli ohi!</h1>
+        <h1 class="screen-title" data-i18n="results.title">Peli ohi!</h1>
         <div class="results-face" id="results-face" aria-hidden="true"></div>
         <div class="results-stats" id="results-stats"></div>
-        <button type="button" class="primary-btn" id="play-again">Pelaa uudelleen</button>
-        <p class="screen-hint">Paina <kbd>Tab</kbd> pelataksesi uudelleen samalla nuottimäärällä.</p>
+        <button
+          type="button"
+          class="primary-btn"
+          id="play-again"
+          data-i18n="results.playAgain"
+        >
+          Pelaa uudelleen
+        </button>
+        <p class="screen-hint">
+          <span data-i18n="results.hintBefore">Paina</span>
+          <kbd>Tab</kbd>
+          <span data-i18n="results.hintAfter">
+            pelataksesi uudelleen samalla nuottimäärällä.
+          </span>
+        </p>
       </section>
     </main>
 

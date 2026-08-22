@@ -86,10 +86,125 @@ function diatonicStep(noteKey) {
   return parseInt(octaveStr, 10) * 7 + LETTER_STEP[letter];
 }
 
+// --- Language ---
+// Finnish is the default; Swedish is a full translation of the same UI. Note
+// names are shared, not translated: both languages use the Nordic convention
+// where the note B is called "H".
+const LANGUAGES = [
+  { id: "fi", label: "Suomi", code: "FI" },
+  { id: "sv", label: "Svenska", code: "SV" },
+];
+
+const DEFAULT_LANGUAGE_ID = "fi";
+const LANG_STORAGE_KEY = "language";
+
+// Every user-visible string lives here, keyed the same way in both languages.
+// Markup-free: the one sentence that wraps a <kbd> is split into the halves
+// around it (results.hintBefore / results.hintAfter).
+const STRINGS = {
+  fi: {
+    "app.title": "Nuottien tunnistaminen",
+    "settings.title": "Asetukset",
+    "settings.reset": "Palauta oletukset",
+    "settings.done": "Valmis",
+    "settings.language": "Kieli",
+    "settings.clef": "Nuottiavain",
+    "settings.theme": "Teema",
+    "settings.ranges": "Nuottialueet",
+    "settings.noNotes": "T\u00e4ll\u00e4 avaimella ei ole viel\u00e4 nuotteja.",
+    "setup.title": "Valitse vaikeustaso ja nuottien m\u00e4\u00e4r\u00e4.",
+    "setup.difficulty": "Vaikeustaso",
+    "setup.noteCount": "Nuottien m\u00e4\u00e4r\u00e4",
+    "game.correct": "Oikein",
+    "game.wrong": "V\u00e4\u00e4rin",
+    "game.streak": "Putki",
+    "game.notePad": "Nuottipainikkeet",
+    "game.progress": "Nuotti {index} / {total}",
+    "game.emptyPool": "Lis\u00e4\u00e4 t\u00e4m\u00e4n avaimen nuotit (CLEFS, script.js).",
+    "results.title": "Peli ohi!",
+    "results.playAgain": "Pelaa uudelleen",
+    "results.hintBefore": "Paina",
+    "results.hintAfter": "pelataksesi uudelleen samalla nuottim\u00e4\u00e4r\u00e4ll\u00e4.",
+    "results.accuracy": "Tarkkuus",
+    "clef.treble": "G-avain",
+    "clef.alto": "C-avain",
+    "clef.bass": "F-avain",
+    "difficulty.easy": "Helppo",
+    "difficulty.medium": "Keskitaso",
+    "difficulty.hard": "Vaikea",
+    "theme.groupLight": "Vaalea",
+    "theme.groupDark": "Tumma",
+    "theme.parchment": "Pergamentti",
+    "theme.arctic": "Arktinen",
+    "theme.espresso": "Espresso",
+    "theme.midnight": "Y\u00f6",
+    "theme.nord": "Nord",
+  },
+  sv: {
+    "app.title": "Notl\u00e4sning",
+    "settings.title": "Inst\u00e4llningar",
+    "settings.reset": "Standardinst\u00e4llningar",
+    "settings.done": "Klar",
+    "settings.language": "Spr\u00e5k",
+    "settings.clef": "Klav",
+    "settings.theme": "Tema",
+    "settings.ranges": "Notomr\u00e5den",
+    "settings.noNotes": "Den h\u00e4r klaven har inga noter \u00e4nnu.",
+    "setup.title": "V\u00e4lj sv\u00e5righetsgrad och antal noter.",
+    "setup.difficulty": "Sv\u00e5righetsgrad",
+    "setup.noteCount": "Antal noter",
+    "game.correct": "R\u00e4tt",
+    "game.wrong": "Fel",
+    "game.streak": "I rad",
+    "game.notePad": "Notknappar",
+    "game.progress": "Not {index} / {total}",
+    "game.emptyPool": "L\u00e4gg till noter f\u00f6r den h\u00e4r klaven (CLEFS, script.js).",
+    "results.title": "Spelet \u00e4r slut!",
+    "results.playAgain": "Spela igen",
+    "results.hintBefore": "Tryck p\u00e5",
+    "results.hintAfter": "f\u00f6r att spela igen med samma antal noter.",
+    "results.accuracy": "Tr\u00e4ffs\u00e4kerhet",
+    "clef.treble": "G-klav",
+    "clef.alto": "C-klav",
+    "clef.bass": "F-klav",
+    "difficulty.easy": "L\u00e4tt",
+    "difficulty.medium": "Medel",
+    "difficulty.hard": "Sv\u00e5r",
+    "theme.groupLight": "Ljus",
+    "theme.groupDark": "M\u00f6rk",
+    "theme.parchment": "Pergament",
+    "theme.arctic": "Arktisk",
+    "theme.espresso": "Espresso",
+    "theme.midnight": "Natt",
+    "theme.nord": "Nord",
+  },
+};
+
+function findLanguage(langId) {
+  return (
+    LANGUAGES.find((l) => l.id === langId) ??
+    LANGUAGES.find((l) => l.id === DEFAULT_LANGUAGE_ID)
+  );
+}
+
+// Resolved before anything is drawn: the clef, theme and difficulty labels are
+// all looked up through t() while their menus are built.
+let currentLanguage = findLanguage(localStorage.getItem(LANG_STORAGE_KEY));
+
+// A missing key falls back to Finnish rather than blanking the UI, so a
+// half-finished translation still leaves a usable page.
+function t(key, vars) {
+  const table = STRINGS[currentLanguage.id] ?? STRINGS[DEFAULT_LANGUAGE_ID];
+  const template = table[key] ?? STRINGS[DEFAULT_LANGUAGE_ID][key] ?? key;
+  if (!vars) return template;
+  return template.replace(/\{(\w+)\}/g, (match, name) =>
+    name in vars ? String(vars[name]) : match,
+  );
+}
+
 const CLEFS = [
   {
     id: "treble",
-    label: "G-avain",
     glyph: "𝄞",
     // The middle (3rd) staff line is B4. Notes at or above it stem downward.
     middleLine: "b/4",
@@ -116,7 +231,6 @@ const CLEFS = [
   },
   {
     id: "alto",
-    label: "C-avain",
     glyph: "𝄡",
     // The middle (3rd) line of the alto (C) clef is middle C itself.
     middleLine: "c/4",
@@ -146,7 +260,6 @@ const CLEFS = [
   },
   {
     id: "bass",
-    label: "F-avain",
     glyph: "𝄢",
     // The middle (3rd) staff line of the bass clef is D3.
     middleLine: "d/3",
@@ -184,9 +297,9 @@ let currentClef = CLEFS[0];
 // spread 4 keeps every note on the staff itself, 6 allows one ledger line
 // above and below, and `null` means the whole pool — ledger lines included.
 const DIFFICULTIES = [
-  { id: "easy", label: "Helppo", spread: 4 },
-  { id: "medium", label: "Keskitaso", spread: 6 },
-  { id: "hard", label: "Vaikea", spread: null },
+  { id: "easy", spread: 4 },
+  { id: "medium", spread: 6 },
+  { id: "hard", spread: null },
 ];
 
 const DEFAULT_DIFFICULTY_ID = "medium";
@@ -299,7 +412,6 @@ const resultsFaceEl = document.getElementById("results-face");
 const appSettingsToggle = document.getElementById("app-settings-toggle");
 const appSettingsMenu = document.getElementById("app-settings-menu");
 const appSettingsBackdrop = document.getElementById("app-settings-backdrop");
-const settingsClefNote = document.getElementById("settings-clef-note");
 const rangeRowsEl = document.getElementById("range-rows");
 const settingsResetBtn = document.getElementById("settings-reset");
 const playAgainBtn = document.getElementById("play-again");
@@ -387,7 +499,7 @@ function renderNotation() {
   if (currentClef.notePool.length === 0) {
     const hint = document.createElement("p");
     hint.className = "clef-empty-hint";
-    hint.textContent = "Lisää tämän avaimen nuotit (CLEFS, script.js).";
+    hint.textContent = t("game.emptyPool");
     notationEl.appendChild(hint);
     return;
   }
@@ -440,7 +552,10 @@ function updateStatus() {
   mistakesEl.textContent = String(wrong);
   streakEl.textContent = String(streak);
   const noteNumber = Math.min(currentIndex + 1, totalNotes);
-  progressEl.textContent = `Nuotti ${noteNumber} / ${totalNotes}`;
+  progressEl.textContent = t("game.progress", {
+    index: noteNumber,
+    total: totalNotes,
+  });
 }
 
 function handleGuess(key) {
@@ -501,75 +616,47 @@ function buildDifficultyOptions() {
     btn.type = "button";
     btn.className = "difficulty-btn";
     btn.dataset.difficulty = d.id;
-    btn.setAttribute("aria-pressed", "false");
+    const active = d.id === currentDifficulty.id;
+    btn.classList.toggle("active", active);
+    btn.setAttribute("aria-pressed", String(active));
 
     const label = document.createElement("span");
     label.className = "difficulty-name";
-    label.textContent = d.label;
+    label.textContent = t(`difficulty.${d.id}`);
 
-    // Filled in by refreshDifficultyHints, which reruns whenever the range or
-    // the clef changes.
-    const hint = document.createElement("span");
-    hint.className = "difficulty-hint";
-
-    btn.append(label, hint);
+    btn.append(label);
     difficultyOptionsEl.appendChild(btn);
   }
 }
 
-// Each level's button carries the span of notes it will actually draw, so a
-// customized range is visible without opening the settings panel.
-function refreshDifficultyHints() {
-  difficultyOptionsEl.querySelectorAll("[data-difficulty]").forEach((btn) => {
-    const hint = btn.querySelector(".difficulty-hint");
-    if (!hint) return;
-    const range = rangeFor(currentClef, findDifficulty(btn.dataset.difficulty));
-    hint.textContent = range
-      ? `${noteLabel(currentClef, range.low)}–${noteLabel(currentClef, range.high)}`
-      : "—";
-  });
-}
-
-// One row per level: the level's name and current span, above a staff showing
-// the clef's whole pool with the level's range highlighted. The staff is drawn
-// by renderRangeStaff once the row is in the document and has a width.
+// One row per level: the level's name above a staff showing the clef's whole
+// pool with the level's range highlighted. The staff is drawn by
+// renderRangeStaff once the row is in the document and has a width.
 function buildRangeRows() {
   rangeRowsEl.replaceChildren();
-  settingsClefNote.textContent = `Napauta nuottia rajataksesi aluetta — avain ${currentClef.label}.`;
 
   if (currentClef.notePool.length === 0) {
     const empty = document.createElement("p");
     empty.className = "settings-note";
-    empty.textContent = "Tällä avaimella ei ole vielä nuotteja.";
+    empty.textContent = t("settings.noNotes");
     rangeRowsEl.appendChild(empty);
     return;
   }
 
   for (const d of DIFFICULTIES) {
-    const range = rangeFor(currentClef, d);
-
     const row = document.createElement("div");
     row.className = "range-row";
     row.dataset.difficulty = d.id;
 
-    const head = document.createElement("div");
-    head.className = "range-row-head";
-
     const name = document.createElement("span");
     name.className = "range-row-name";
-    name.textContent = d.label;
-
-    const span = document.createElement("span");
-    span.className = "range-row-span";
-    span.textContent = `${noteLabel(currentClef, range.low)}–${noteLabel(currentClef, range.high)}`;
-
-    head.append(name, span);
+    name.textContent = t(`difficulty.${d.id}`);
 
     const staff = document.createElement("div");
     staff.className = "range-staff";
     staff.dataset.difficulty = d.id;
 
-    row.append(head, staff);
+    row.append(name, staff);
     rangeRowsEl.appendChild(row);
   }
 
@@ -687,7 +774,7 @@ function renderRangeStaff(staffEl) {
     );
     hit.setAttribute(
       "aria-label",
-      `${difficulty.label}: ${noteLabel(currentClef, note.key)}`,
+      `${t(`difficulty.${difficulty.id}`)}: ${noteLabel(currentClef, note.key)}`,
     );
     staffEl.appendChild(hit);
   });
@@ -716,7 +803,6 @@ function setRangeFromNote(difficultyId, key) {
   noteRanges[rangeKey(currentClef.id, difficulty.id)] = next;
   localStorage.setItem(RANGE_STORAGE_KEY, JSON.stringify(noteRanges));
   buildRangeRows();
-  refreshDifficultyHints();
 }
 
 function applyDifficulty(difficultyId) {
@@ -726,7 +812,6 @@ function applyDifficulty(difficultyId) {
     btn.classList.toggle("active", active);
     btn.setAttribute("aria-pressed", String(active));
   });
-  refreshDifficultyHints();
 }
 
 function buildNotePad() {
@@ -778,20 +863,17 @@ function faceForAccuracy(accuracy) {
   return FACE_TIERS.find((tier) => accuracy >= tier.min) ?? FACE_TIERS.at(-1);
 }
 
-function renderResultsFace(accuracy) {
+// Kept so the results can be redrawn in the other language while they are
+// still on screen.
+let lastAccuracy = 0;
+
+function renderResults(accuracy) {
   resultsFaceEl.textContent = faceForAccuracy(accuracy).emoji;
-}
 
-function endGame() {
-  gameActive = false;
-
-  const total = correct + wrong;
-  const accuracy = total > 0 ? Math.round((correct / total) * 100) : 0;
-  renderResultsFace(accuracy);
   const stats = [
-    ["Oikein", correct],
-    ["Väärin", wrong],
-    ["Tarkkuus", `${accuracy} %`],
+    [t("game.correct"), correct],
+    [t("game.wrong"), wrong],
+    [t("results.accuracy"), `${accuracy} %`],
   ];
 
   resultsStatsEl.replaceChildren();
@@ -805,7 +887,14 @@ function endGame() {
     row.append(span, strong);
     resultsStatsEl.appendChild(row);
   }
+}
 
+function endGame() {
+  gameActive = false;
+
+  const total = correct + wrong;
+  lastAccuracy = total > 0 ? Math.round((correct / total) * 100) : 0;
+  renderResults(lastAccuracy);
   showScreen(resultsScreen);
 }
 
@@ -851,7 +940,6 @@ settingsResetBtn.addEventListener("click", () => {
   }
   localStorage.setItem(RANGE_STORAGE_KEY, JSON.stringify(noteRanges));
   buildRangeRows();
-  refreshDifficultyHints();
 });
 
 playAgainBtn.addEventListener("click", showSetup);
@@ -867,40 +955,111 @@ window.addEventListener("resize", () => {
   if (!appSettingsMenu.hidden) renderRangeStaves();
 });
 
+// --- Language picker (a section of the settings menu) ---
+const langMenu = document.getElementById("lang-menu");
+
+function buildLangMenu() {
+  langMenu.replaceChildren();
+  for (const lang of LANGUAGES) {
+    const btn = document.createElement("button");
+    btn.className = "lang-menu-item";
+    btn.dataset.lang = lang.id;
+    btn.setAttribute("role", "option");
+    btn.classList.toggle("active", lang.id === currentLanguage.id);
+
+    // A two-letter badge rather than a flag emoji: flags render as bare
+    // letter pairs wherever the emoji font lacks them.
+    const code = document.createElement("span");
+    code.className = "lang-code";
+    code.textContent = lang.code;
+    btn.appendChild(code);
+
+    // Language names are never translated: someone hunting for Swedish looks
+    // for "Svenska", whatever the page currently speaks.
+    btn.appendChild(document.createTextNode(lang.label));
+    langMenu.appendChild(btn);
+  }
+}
+
+// The markup holds the Finnish text plus a data-i18n key naming its string;
+// data-i18n-aria does the same for labels that are only read out.
+function translateStaticText() {
+  document.querySelectorAll("[data-i18n]").forEach((el) => {
+    el.textContent = t(el.dataset.i18n);
+  });
+  document.querySelectorAll("[data-i18n-aria]").forEach((el) => {
+    el.setAttribute("aria-label", t(el.dataset.i18nAria));
+  });
+}
+
+// Everything drawn from JS carries a translated label somewhere, so switching
+// language simply rebuilds it — the builders re-mark the active entries, which
+// keeps the selections intact. A running game is deliberately left running:
+// only the words change.
+function applyLanguage(langId) {
+  currentLanguage = findLanguage(langId);
+  document.documentElement.lang = currentLanguage.id;
+  // <title> carries a data-i18n key like every other static string.
+  translateStaticText();
+  buildLangMenu();
+  buildThemeMenu();
+  buildClefMenu();
+  buildDifficultyOptions();
+  buildRangeRows();
+  renderNotation();
+  if (gameActive) updateStatus();
+  if (!resultsScreen.hidden) renderResults(lastAccuracy);
+}
+
+langMenu.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-lang]");
+  if (!btn) return;
+  const id = btn.dataset.lang;
+  localStorage.setItem(LANG_STORAGE_KEY, id);
+  applyLanguage(id);
+});
+
 const THEMES = [
-  { id: "parchment", label: "Pergamentti", color: "#f4ede4", group: "light" },
-  { id: "arctic", label: "Arktinen", color: "#f7fafd", group: "light" },
-  { id: "espresso", label: "Espresso", color: "#271d14", group: "dark" },
-  { id: "midnight", label: "Yö", color: "#1a2238", group: "dark" },
-  { id: "nord", label: "Nord", color: "#3b4252", group: "dark" },
+  { id: "parchment", color: "#f4ede4", group: "light" },
+  { id: "arctic", color: "#f7fafd", group: "light" },
+  { id: "espresso", color: "#271d14", group: "dark" },
+  { id: "midnight", color: "#1a2238", group: "dark" },
+  { id: "nord", color: "#3b4252", group: "dark" },
 ];
 
 const themeMenu = document.getElementById("theme-menu");
 
+// Rebuilt from scratch on a language change, so the active entry is marked
+// from the attribute already on <html> rather than passed in.
 function buildThemeMenu() {
   themeMenu.replaceChildren();
-  for (const [groupLabel, groupId] of [["Vaalea", "light"], ["Tumma", "dark"]]) {
+  const activeId = document.documentElement.getAttribute("data-theme");
+  for (const [groupKey, groupId] of [
+    ["theme.groupLight", "light"],
+    ["theme.groupDark", "dark"],
+  ]) {
     const section = document.createElement("div");
     section.className = "theme-menu-section";
     section.dataset.group = groupId;
 
     const header = document.createElement("div");
     header.className = "theme-menu-group";
-    header.textContent = groupLabel;
+    header.textContent = t(groupKey);
     section.appendChild(header);
 
-    for (const t of THEMES.filter((t) => t.group === groupId)) {
+    for (const theme of THEMES.filter((entry) => entry.group === groupId)) {
       const btn = document.createElement("button");
       btn.className = "theme-menu-item";
-      btn.dataset.theme = t.id;
+      btn.dataset.theme = theme.id;
       btn.setAttribute("role", "option");
+      btn.classList.toggle("active", theme.id === activeId);
 
       const swatch = document.createElement("span");
       swatch.className = "swatch";
-      swatch.style.background = t.color;
+      swatch.style.background = theme.color;
       btn.appendChild(swatch);
 
-      btn.appendChild(document.createTextNode(t.label));
+      btn.appendChild(document.createTextNode(t(`theme.${theme.id}`)));
       section.appendChild(btn);
     }
     themeMenu.appendChild(section);
@@ -908,7 +1067,7 @@ function buildThemeMenu() {
 }
 
 function applyTheme(themeId) {
-  const theme = THEMES.find((t) => t.id === themeId) || THEMES[0];
+  const theme = THEMES.find((entry) => entry.id === themeId) || THEMES[0];
   document.documentElement.setAttribute("data-theme", theme.id);
   themeMenu.querySelectorAll(".theme-menu-item").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.theme === theme.id);
@@ -925,7 +1084,7 @@ const savedTheme = localStorage.getItem("theme");
 const initialTheme =
   savedTheme === "dark"
     ? "espresso"
-    : THEMES.find((t) => t.id === savedTheme)
+    : THEMES.find((entry) => entry.id === savedTheme)
       ? savedTheme
       : "parchment";
 applyTheme(initialTheme);
@@ -948,13 +1107,14 @@ function buildClefMenu() {
     btn.className = "clef-menu-item";
     btn.dataset.clef = c.id;
     btn.setAttribute("role", "option");
+    btn.classList.toggle("active", c.id === currentClef.id);
 
     const glyph = document.createElement("span");
     glyph.className = "clef-glyph";
     glyph.textContent = c.glyph;
     btn.appendChild(glyph);
 
-    btn.appendChild(document.createTextNode(c.label));
+    btn.appendChild(document.createTextNode(t(`clef.${c.id}`)));
     clefMenu.appendChild(btn);
   }
 }
@@ -966,10 +1126,9 @@ function applyClef(clefId) {
   });
   // A single staff can only carry one clef, so switching mid-game would mix
   // incompatible note positions — restart the round with the new clef instead.
-  // Ranges are per clef, so both the panel and the level hints have to be
-  // redrawn for the clef that is now showing.
+  // Ranges are per clef, so the panel has to be redrawn for the clef that is
+  // now showing.
   buildRangeRows();
-  refreshDifficultyHints();
   if (gameActive) {
     startGame();
   } else {
@@ -1027,6 +1186,8 @@ buildDifficultyOptions();
 buildRangeRows();
 applyDifficulty(currentDifficulty.id);
 buildNotePad();
+// Last, so it can rebuild every menu above in the saved language.
+applyLanguage(currentLanguage.id);
 showSetup();
 
 // --- Ambient background: rising note particles + pointer parallax ---
