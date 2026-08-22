@@ -184,12 +184,25 @@ let currentClef = CLEFS[0];
 // spread 4 keeps every note on the staff itself, 6 allows one ledger line
 // above and below, and `null` means the whole pool — ledger lines included.
 const DIFFICULTIES = [
-  { id: "easy", label: "Helppo", hint: "Vain viivastolla", spread: 4 },
-  { id: "medium", label: "Keskitaso", hint: "Yksi apuviiva", spread: 6 },
+  { id: "easy", label: "Helppo", hint: "Viivastolla", spread: 4 },
+  { id: "medium", label: "Keskitaso", hint: "1 apuviiva", spread: 6 },
   { id: "hard", label: "Vaikea", hint: "Koko ala", spread: null },
 ];
 
-let currentDifficulty = DIFFICULTIES[1];
+const DEFAULT_DIFFICULTY_ID = "medium";
+
+function findDifficulty(difficultyId) {
+  return (
+    DIFFICULTIES.find((d) => d.id === difficultyId) ??
+    DIFFICULTIES.find((d) => d.id === DEFAULT_DIFFICULTY_ID)
+  );
+}
+
+// Restored here rather than in the init block at the bottom of the file: the
+// theme and clef setup both render the staff on load, and those renders draw
+// from this pool. Resolving the saved level up front keeps the first notes
+// drawn consistent with the highlighted button, whatever runs first.
+let currentDifficulty = findDifficulty(localStorage.getItem("difficulty"));
 
 // The notes actually in play: the current clef's pool cropped by the current
 // difficulty. Cropping (rather than listing a pool per clef per difficulty)
@@ -433,8 +446,7 @@ function buildDifficultyOptions() {
 }
 
 function applyDifficulty(difficultyId) {
-  currentDifficulty =
-    DIFFICULTIES.find((d) => d.id === difficultyId) || DIFFICULTIES[1];
+  currentDifficulty = findDifficulty(difficultyId);
   difficultyOptionsEl.querySelectorAll("[data-difficulty]").forEach((btn) => {
     const active = btn.dataset.difficulty === currentDifficulty.id;
     btn.classList.toggle("active", active);
@@ -709,7 +721,7 @@ document.addEventListener("click", (e) => {
 
 buildNoteCountOptions();
 buildDifficultyOptions();
-applyDifficulty(localStorage.getItem("difficulty") ?? DIFFICULTIES[1].id);
+applyDifficulty(currentDifficulty.id);
 buildNotePad();
 showSetup();
 
