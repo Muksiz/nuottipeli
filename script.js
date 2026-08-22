@@ -1,4 +1,4 @@
-const { Renderer, Stave, StaveNote, Voice, Formatter } = Vex.Flow;
+const { Renderer, Stave, StaveNote, Voice, Formatter, TickContext } = Vex.Flow;
 
 // --- Piano audio synthesis ---
 // Frequencies are derived from the note key (e.g. "c/4") in equal temperament
@@ -296,8 +296,9 @@ const noteCountOptionsEl = document.getElementById("note-count-options");
 const difficultyOptionsEl = document.getElementById("difficulty-options");
 const resultsStatsEl = document.getElementById("results-stats");
 const resultsFaceEl = document.getElementById("results-face");
-const settingsToggle = document.getElementById("settings-toggle");
-const settingsPanel = document.getElementById("settings-panel");
+const appSettingsToggle = document.getElementById("app-settings-toggle");
+const appSettingsMenu = document.getElementById("app-settings-menu");
+const appSettingsBackdrop = document.getElementById("app-settings-backdrop");
 const settingsClefNote = document.getElementById("settings-clef-note");
 const rangeRowsEl = document.getElementById("range-rows");
 const settingsResetBtn = document.getElementById("settings-reset");
@@ -579,6 +580,12 @@ function buildRangeRows() {
 // current-note color and the rest faded, then lays a transparent button over
 // each note's column so the whole height of the staff is clickable — hitting a
 // notehead exactly would be hopeless on a phone.
+//
+// Both the height and the note spacing are computed rather than fixed: a pool
+// reaching two ledger lines above and below needs more vertical room than one
+// that stays on the staff, and the notes are placed at even intervals of our
+// own choosing so the tail of a long pool cannot bunch up past the stave's
+// right edge the way an auto-justified voice does.
 function renderRangeStaff(staffEl) {
   const difficulty = findDifficulty(staffEl.dataset.difficulty);
   const range = rangeFor(currentClef, difficulty);
@@ -588,7 +595,21 @@ function renderRangeStaff(staffEl) {
   staffEl.replaceChildren();
 
   const width = staffEl.clientWidth || 600;
-  const height = 130;
+
+  // VexFlow's staff lines sit 10px apart, so one diatonic step is 5px.
+  const STEP_PX = 5;
+  const steps = pool.map((note) => diatonicStep(note.key));
+  const middle = diatonicStep(currentClef.middleLine);
+  const aboveTop = Math.max(0, Math.max(...steps) - (middle + 4));
+  const belowBottom = Math.max(0, middle - 4 - Math.min(...steps));
+  // The clef glyph itself overhangs the staff, which sets the minimums.
+  const padTop = Math.max(20, aboveTop * STEP_PX + 18);
+  const padBottom = Math.max(30, belowBottom * STEP_PX + 18);
+  // A Stave draws its top line four line-spaces below the y it is given —
+  // room it reserves for ledger lines — so the y we want is that much higher.
+  const STAVE_TOP_RESERVE = 40;
+  const staveY = Math.max(0, padTop - STAVE_TOP_RESERVE);
+  const height = staveY + STAVE_TOP_RESERVE + 40 + padBottom;
 
   const renderer = new Renderer(staffEl, Renderer.Backends.SVG);
   renderer.resize(width, height);
@@ -602,8 +623,9 @@ function renderRangeStaff(staffEl) {
   context.setFillStyle(staffColor);
   context.setStrokeStyle(staffColor);
 
+  const staveX = 2;
   const staveWidth = width - 4;
-  const stave = new Stave(2, 22, staveWidth);
+  const stave = new Stave(staveX, staveY, staveWidth);
   stave.addClef(currentClef.id);
   stave.setDefaultLedgerLineStyle({
     strokeStyle: ledgerColor,
@@ -616,9 +638,8 @@ function renderRangeStaff(staffEl) {
   const high = diatonicStep(range.high);
 
   // Whole notes: no stems to clutter a staff that is a control, not music.
-  const staveNotes = pool.map((note) => {
-    const step = diatonicStep(note.key);
-    const inRange = step >= low && step <= high;
+  const staveNotes = pool.map((note, i) => {
+    const inRange = steps[i] >= low && steps[i] <= high;
     const sn = new StaveNote({
       keys: [note.key],
       duration: "w",
@@ -626,13 +647,25 @@ function renderRangeStaff(staffEl) {
     });
     const color = inRange ? inColor : outColor;
     sn.setStyle({ fillStyle: color, strokeStyle: color });
+    sn.setContext(context).setStave(stave);
+    // Each note gets a tick context of its own so its x is ours to set; the
+    // x we hand it is measured from where the stave's notes begin.
+    new TickContext().addTickable(sn).preFormat().setX(0);
     return sn;
   });
 
-  const voice = new Voice({ num_beats: pool.length * 4, beat_value: 4 });
-  voice.addTickables(staveNotes);
-  new Formatter().joinVoices([voice]).format([voice], staveWidth - 60);
-  voice.draw(context, stave);
+  // Where a note placed at x = 0 actually lands, i.e. just past the clef.
+  const baseX = staveNotes[0].getAbsoluteX();
+  // Insets keep the first and last noteheads — and their ledger lines — clear
+  // of the clef and of the stave's right edge.
+  const first = 10;
+  const last = Math.max(first, staveX + staveWidth - 24 - baseX);
+  const gap = pool.length > 1 ? (last - first) / (pool.length - 1) : 0;
+
+  staveNotes.forEach((sn, i) => {
+    sn.getTickContext().setX(first + i * gap);
+    sn.draw();
+  });
 
   // Column boundaries sit halfway between neighbouring noteheads, so every
   // pixel of the staff belongs to exactly one note.
@@ -640,7 +673,6 @@ function renderRangeStaff(staffEl) {
   pool.forEach((note, i) => {
     const left = i === 0 ? 0 : (xs[i - 1] + xs[i]) / 2;
     const right = i === pool.length - 1 ? width : (xs[i] + xs[i + 1]) / 2;
-    const step = diatonicStep(note.key);
 
     const hit = document.createElement("button");
     hit.type = "button";
@@ -649,7 +681,10 @@ function renderRangeStaff(staffEl) {
     hit.dataset.key = note.key;
     hit.style.left = `${left}px`;
     hit.style.width = `${right - left}px`;
-    hit.setAttribute("aria-pressed", String(step >= low && step <= high));
+    hit.setAttribute(
+      "aria-pressed",
+      String(steps[i] >= low && steps[i] <= high),
+    );
     hit.setAttribute(
       "aria-label",
       `${difficulty.label}: ${noteLabel(currentClef, note.key)}`,
@@ -775,6 +810,9 @@ function endGame() {
 }
 
 window.addEventListener("keydown", (event) => {
+  // The settings dialog owns the keyboard while it is open, so a stray letter
+  // there is not counted as an answer.
+  if (!appSettingsMenu.hidden) return;
   // On the results screen, Tab quickly replays the same number of notes.
   if (event.key === "Tab" && !resultsScreen.hidden) {
     event.preventDefault();
@@ -797,15 +835,6 @@ difficultyOptionsEl.addEventListener("click", (event) => {
   if (!btn) return;
   localStorage.setItem("difficulty", btn.dataset.difficulty);
   applyDifficulty(btn.dataset.difficulty);
-});
-
-settingsToggle.addEventListener("click", () => {
-  const open = settingsPanel.hidden;
-  settingsPanel.hidden = !open;
-  settingsToggle.setAttribute("aria-expanded", String(open));
-  // A hidden panel has no width, so the staves can only be laid out once it is
-  // on screen.
-  if (open) renderRangeStaves();
 });
 
 rangeRowsEl.addEventListener("click", (event) => {
@@ -835,7 +864,7 @@ notePadEl.addEventListener("click", (event) => {
 
 window.addEventListener("resize", () => {
   renderNotation();
-  if (!settingsPanel.hidden) renderRangeStaves();
+  if (!appSettingsMenu.hidden) renderRangeStaves();
 });
 
 const THEMES = [
@@ -846,10 +875,7 @@ const THEMES = [
   { id: "nord", label: "Nord", color: "#3b4252", group: "dark" },
 ];
 
-const themeToggle = document.getElementById("theme-toggle");
 const themeMenu = document.getElementById("theme-menu");
-const themeSwatch = document.getElementById("theme-swatch");
-const themeLabel = document.getElementById("theme-label");
 
 function buildThemeMenu() {
   themeMenu.replaceChildren();
@@ -884,15 +910,13 @@ function buildThemeMenu() {
 function applyTheme(themeId) {
   const theme = THEMES.find((t) => t.id === themeId) || THEMES[0];
   document.documentElement.setAttribute("data-theme", theme.id);
-  themeSwatch.style.background = theme.color;
-  themeLabel.textContent = theme.label;
   themeMenu.querySelectorAll(".theme-menu-item").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.theme === theme.id);
   });
   renderNotation();
   // Note colors are read from CSS at draw time, so the picker staves have to be
   // redrawn for the new palette.
-  if (settingsPanel && !settingsPanel.hidden) renderRangeStaves();
+  if (!appSettingsMenu.hidden) renderRangeStaves();
 }
 
 buildThemeMenu();
@@ -906,30 +930,16 @@ const initialTheme =
       : "parchment";
 applyTheme(initialTheme);
 
-themeToggle.addEventListener("click", () => {
-  themeMenu.classList.toggle("open");
-});
-
 themeMenu.addEventListener("click", (e) => {
   const btn = e.target.closest("[data-theme]");
   if (!btn) return;
   const id = btn.dataset.theme;
   localStorage.setItem("theme", id);
   applyTheme(id);
-  themeMenu.classList.remove("open");
 });
 
-document.addEventListener("click", (e) => {
-  if (!e.target.closest("#theme-picker")) {
-    themeMenu.classList.remove("open");
-  }
-});
-
-// --- Clef picker (mirrors the theme picker, anchored top-left) ---
-const clefToggle = document.getElementById("clef-toggle");
+// --- Clef picker (a second section of the same settings menu) ---
 const clefMenu = document.getElementById("clef-menu");
-const clefGlyph = document.getElementById("clef-glyph");
-const clefLabel = document.getElementById("clef-label");
 
 function buildClefMenu() {
   clefMenu.replaceChildren();
@@ -951,8 +961,6 @@ function buildClefMenu() {
 
 function applyClef(clefId) {
   currentClef = CLEFS.find((c) => c.id === clefId) || CLEFS[0];
-  clefGlyph.textContent = currentClef.glyph;
-  clefLabel.textContent = currentClef.label;
   clefMenu.querySelectorAll(".clef-menu-item").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.clef === currentClef.id);
   });
@@ -974,23 +982,44 @@ buildClefMenu();
 const savedClef = localStorage.getItem("clef");
 applyClef(CLEFS.find((c) => c.id === savedClef) ? savedClef : CLEFS[0].id);
 
-clefToggle.addEventListener("click", () => {
-  clefMenu.classList.toggle("open");
-});
-
 clefMenu.addEventListener("click", (e) => {
   const btn = e.target.closest("[data-clef]");
   if (!btn) return;
   const id = btn.dataset.clef;
   localStorage.setItem("clef", id);
+  // The dialog stays open — applyClef rebuilds the range rows below for the
+  // clef that is now showing, and that is worth seeing.
   applyClef(id);
-  clefMenu.classList.remove("open");
 });
 
-document.addEventListener("click", (e) => {
-  if (!e.target.closest("#clef-picker")) {
-    clefMenu.classList.remove("open");
-  }
+// --- Settings dialog ---
+// Clef, theme and note ranges are all set once and then forgotten, so none of
+// them sit on screen for the whole game: the gear button opens them together.
+function setAppSettingsOpen(open) {
+  appSettingsMenu.hidden = !open;
+  appSettingsBackdrop.hidden = !open;
+  appSettingsToggle.setAttribute("aria-expanded", String(open));
+  // A hidden dialog has no width, so the range staves can only be laid out
+  // once it is on screen.
+  if (open) renderRangeStaves();
+}
+
+function closeAppSettings() {
+  setAppSettingsOpen(false);
+}
+
+appSettingsToggle.addEventListener("click", () => {
+  setAppSettingsOpen(appSettingsMenu.hidden);
+});
+
+appSettingsBackdrop.addEventListener("click", closeAppSettings);
+
+document
+  .getElementById("app-settings-done")
+  .addEventListener("click", closeAppSettings);
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape") closeAppSettings();
 });
 
 buildNoteCountOptions();

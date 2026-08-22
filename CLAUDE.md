@@ -24,7 +24,9 @@ No build step, no package manager. Open `index.html` in a browser to run. The en
 
 **Difficulty**: Three levels (`DIFFICULTIES` in `script.js`) that only change the range of notes drawn. Each level's `spread` gives a *default* range: the active clef's `notePool` cropped to a band of diatonic steps around the clef's middle staff line — easy stays on the staff, medium allows one ledger line either side, hard uses the whole pool. Chosen on the setup screen and persisted in `localStorage` under `"difficulty"`.
 
-**Note ranges**: The setup screen's "Säädä nuottialueita" panel overrides any level's range with an explicit lowest/highest note picked from the current clef's pool. Overrides are stored per clef and per level in `localStorage` under `"noteRanges"` as `{ "<clefId>:<difficultyId>": { low, high } }`; anything missing or naming notes the clef lacks falls back to the `spread` default. The reset button clears only the current clef's levels. Each difficulty button shows the range it will use.
+**Note ranges**: The settings dialog's "Nuottialueet" section overrides any level's range with an explicit lowest/highest note picked from the current clef's pool. Overrides are stored per clef and per level in `localStorage` under `"noteRanges"` as `{ "<clefId>:<difficultyId>": { low, high } }`; anything missing or naming notes the clef lacks falls back to the `spread` default. The reset button clears only the current clef's levels. Each difficulty button shows the range it will use.
+
+**Settings dialog**: The gear button in the toolbar is the only always-visible control. It opens a centered modal (`#app-settings-menu`, with a backdrop) holding the clef list, the theme list and the note-range editor — all three are set once and then forgotten, so none of them take up room during play. The clef and theme lists keep their `.clef-menu` / `.theme-menu` class names from when they were dropdowns of their own.
 
 **Theme system**: 8 themes (4 light, 4 dark) defined as `[data-theme="name"]` CSS blocks. JS sets the attribute on `<html>`. Theme choice persists in `localStorage` under key `"theme"`. Backward-compatible with legacy `"dark"`/`"light"` values.
 

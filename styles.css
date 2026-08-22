@@ -334,22 +334,22 @@ body {
 
 .toolbar {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   margin-bottom: 8px;
 }
 
-.theme-picker,
-.clef-picker {
+/* Clef and theme are chosen once and then forgotten, so they live behind a
+   single gear button instead of taking up screen room for the whole game. */
+.app-settings {
   position: relative;
 }
 
-.theme-toggle,
-.clef-toggle {
+.app-settings-toggle {
   background: var(--toggle-bg);
   border: 1px solid var(--toggle-border);
   color: var(--toggle-text);
   height: 36px;
-  padding: 0 12px;
+  padding: 0 14px;
   border-radius: 8px;
   cursor: pointer;
   font-size: 0.82rem;
@@ -357,57 +357,105 @@ body {
   font-weight: 500;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   transition: background 0.2s ease, border-color 0.2s ease, transform 0.15s ease;
 }
 
-.theme-toggle:hover,
-.clef-toggle:hover {
+.app-settings-toggle:hover {
   transform: translateY(-1px);
 }
 
-.theme-toggle:active,
-.clef-toggle:active {
+.app-settings-toggle:active {
   transform: translateY(0);
 }
 
-.theme-toggle .swatch {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 1.5px solid var(--toggle-border);
-  flex-shrink: 0;
-}
-
-.theme-toggle .chevron,
-.clef-toggle .chevron {
-  font-size: 0.6rem;
-  opacity: 0.6;
-  margin-left: 2px;
-}
-
-.clef-toggle .clef-glyph {
-  font-size: 1.15rem;
+.app-settings-toggle .gear {
+  font-size: 1rem;
   line-height: 1;
-  flex-shrink: 0;
 }
 
-.theme-menu {
-  display: none;
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
+.app-settings-toggle[aria-expanded="true"] .gear {
+  transform: rotate(45deg);
+}
+
+.app-settings-toggle .gear {
+  transition: transform 0.2s ease;
+}
+
+/* A centered dialog rather than a dropdown: the note-range rows inside need a
+   staff's worth of width, which no menu hanging off the toolbar would have. */
+.app-settings-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 90;
+}
+
+.app-settings-menu {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(700px, calc(100vw - 24px));
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
+  display: grid;
+  gap: 18px;
+  justify-items: center;
   background: var(--card-bg);
   border: 1px solid var(--card-border);
-  border-radius: 10px;
-  padding: 4px;
-  box-shadow: 0 8px 24px var(--card-shadow);
+  border-radius: 14px;
+  padding: 18px;
+  box-shadow: 0 24px 64px var(--card-shadow);
   z-index: 100;
-  min-width: 170px;
   transition: background 0.2s ease, border-color 0.2s ease;
 }
 
-.theme-menu.open {
+.app-settings-backdrop[hidden],
+.app-settings-menu[hidden] {
+  display: none;
+}
+
+.app-settings-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  align-items: start;
+  width: 100%;
+}
+
+.app-settings-group {
+  width: 100%;
+}
+
+.app-settings-done {
+  font-family: inherit;
+  font-size: 0.85rem;
+  background: var(--toggle-bg);
+  border: 1px solid var(--toggle-border);
+  border-radius: 8px;
+  color: var(--toggle-text);
+  padding: 8px 22px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.app-settings-done:hover {
+  color: var(--note-current);
+  border-color: var(--note-current);
+}
+
+.app-settings-heading {
+  margin: 0 0 4px;
+  padding: 0 4px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--status-label);
+}
+
+.theme-menu {
   display: block;
 }
 
@@ -505,21 +553,6 @@ body {
 /* The clef menu lists only two entries, so it skips the theme menu's
    light/dark grouping and simply follows the active theme's colors. */
 .clef-menu {
-  display: none;
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 10px;
-  padding: 4px;
-  box-shadow: 0 8px 24px var(--card-shadow);
-  z-index: 100;
-  min-width: 150px;
-  transition: background 0.2s ease, border-color 0.2s ease;
-}
-
-.clef-menu.open {
   display: block;
 }
 
@@ -551,7 +584,7 @@ body {
 .clef-menu-item .clef-glyph {
   font-size: 1.4rem;
   line-height: 1;
-  width: 22px;
+  width: 26px;
   text-align: center;
 }
 
@@ -662,32 +695,11 @@ body {
 
 /* --- Note range settings --- */
 
-.settings-toggle {
-  font-family: inherit;
-  font-size: 0.85rem;
-  background: none;
-  border: none;
-  border-bottom: 1px dashed var(--toggle-border);
-  color: var(--status-label);
-  padding: 2px 0;
-  cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease;
-}
-
-.settings-toggle:hover {
-  color: var(--note-current);
-  border-color: var(--note-current);
-}
-
 .settings-panel {
   display: grid;
   gap: 10px;
   justify-items: center;
   width: 100%;
-  padding: 14px 12px;
-  border: 1px solid var(--toggle-border);
-  border-radius: 10px;
-  background: var(--toggle-bg);
 }
 
 .settings-note {
@@ -991,6 +1003,11 @@ body {
 
   .note-count-options {
     grid-template-columns: repeat(3, 1fr);
+  }
+
+  .app-settings-cols {
+    grid-template-columns: 1fr;
+    gap: 12px;
   }
 
   .difficulty-hint {

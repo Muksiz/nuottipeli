@@ -18,21 +18,51 @@
     <div class="notes-layer" aria-hidden="true"></div>
     <main class="app">
       <div class="toolbar">
-        <div class="clef-picker" id="clef-picker">
-          <button id="clef-toggle" class="clef-toggle" type="button" aria-label="Vaihda nuottiavain">
-            <span class="clef-glyph" id="clef-glyph"></span>
-            <span id="clef-label"></span>
-            <span class="chevron">▼</span>
+        <div class="app-settings" id="app-settings">
+          <button
+            id="app-settings-toggle"
+            class="app-settings-toggle"
+            type="button"
+            aria-label="Asetukset"
+            aria-expanded="false"
+            aria-controls="app-settings-menu"
+          >
+            <span class="gear" aria-hidden="true">⚙</span>
+            <span class="app-settings-text">Asetukset</span>
           </button>
-          <div class="clef-menu" id="clef-menu" role="listbox"></div>
-        </div>
-        <div class="theme-picker" id="theme-picker">
-          <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Vaihda teema">
-            <span class="swatch" id="theme-swatch"></span>
-            <span id="theme-label"></span>
-            <span class="chevron">▼</span>
-          </button>
-          <div class="theme-menu" id="theme-menu" role="listbox"></div>
+          <div class="app-settings-backdrop" id="app-settings-backdrop" hidden></div>
+          <div
+            class="app-settings-menu"
+            id="app-settings-menu"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Asetukset"
+            hidden
+          >
+            <div class="app-settings-cols">
+              <div class="app-settings-group">
+                <p class="app-settings-heading">Nuottiavain</p>
+                <div class="clef-menu" id="clef-menu" role="listbox"></div>
+              </div>
+              <div class="app-settings-group">
+                <p class="app-settings-heading">Teema</p>
+                <div class="theme-menu" id="theme-menu" role="listbox"></div>
+              </div>
+            </div>
+            <div class="app-settings-group">
+              <p class="app-settings-heading">Nuottialueet</p>
+              <div class="settings-panel" id="settings-panel">
+                <p class="settings-note" id="settings-clef-note"></p>
+                <div class="range-rows" id="range-rows"></div>
+                <button type="button" class="settings-reset" id="settings-reset">
+                  Palauta oletukset
+                </button>
+              </div>
+            </div>
+            <button type="button" class="app-settings-done" id="app-settings-done">
+              Valmis
+            </button>
+          </div>
         </div>
       </div>
 
@@ -46,24 +76,6 @@
             role="group"
             aria-labelledby="difficulty-label"
           ></div>
-        </div>
-        <div class="setup-group">
-          <button
-            type="button"
-            class="settings-toggle"
-            id="settings-toggle"
-            aria-expanded="false"
-            aria-controls="settings-panel"
-          >
-            Säädä nuottialueita
-          </button>
-          <div class="settings-panel" id="settings-panel" hidden>
-            <p class="settings-note" id="settings-clef-note"></p>
-            <div class="range-rows" id="range-rows"></div>
-            <button type="button" class="settings-reset" id="settings-reset">
-              Palauta oletukset
-            </button>
-          </div>
         </div>
         <div class="setup-group">
           <p class="setup-label" id="note-count-label">Nuottien määrä</p>
