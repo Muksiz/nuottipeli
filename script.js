@@ -176,6 +176,36 @@ const CLEFS = [
 
 let currentClef = CLEFS[0];
 
+// --- Difficulty ---
+// Difficulty only narrows *which* notes can appear: every level draws from the
+// active clef's pool, cropped to a band centered on the clef's middle staff
+// line. `spread` is that band's half-width in diatonic steps (see
+// diatonicStep). A staff spans 4 steps either side of its middle line, so
+// spread 4 keeps every note on the staff itself, 6 allows one ledger line
+// above and below, and `null` means the whole pool — ledger lines included.
+const DIFFICULTIES = [
+  { id: "easy", label: "Helppo", hint: "Vain viivastolla", spread: 4 },
+  { id: "medium", label: "Keskitaso", hint: "Yksi apuviiva", spread: 6 },
+  { id: "hard", label: "Vaikea", hint: "Koko ala", spread: null },
+];
+
+let currentDifficulty = DIFFICULTIES[1];
+
+// The notes actually in play: the current clef's pool cropped by the current
+// difficulty. Cropping (rather than listing a pool per clef per difficulty)
+// keeps a new clef working at every level as soon as its notePool is filled in.
+function activeNotePool() {
+  const { spread } = currentDifficulty;
+  if (spread === null) return currentClef.notePool;
+  const middle = diatonicStep(currentClef.middleLine);
+  const pool = currentClef.notePool.filter(
+    (note) => Math.abs(diatonicStep(note.key) - middle) <= spread,
+  );
+  // A clef whose pool sits entirely outside the band would leave nothing to
+  // draw; fall back to the full pool rather than an empty staff.
+  return pool.length > 0 ? pool : currentClef.notePool;
+}
+
 const notationEl = document.getElementById("notation");
 const scoreEl = document.getElementById("score");
 const mistakesEl = document.getElementById("mistakes");
@@ -185,6 +215,7 @@ const setupScreen = document.getElementById("setup-screen");
 const gameScreen = document.getElementById("game-screen");
 const resultsScreen = document.getElementById("results-screen");
 const noteCountOptionsEl = document.getElementById("note-count-options");
+const difficultyOptionsEl = document.getElementById("difficulty-options");
 const resultsStatsEl = document.getElementById("results-stats");
 const resultsFaceEl = document.getElementById("results-face");
 const playAgainBtn = document.getElementById("play-again");
@@ -203,7 +234,7 @@ let totalNotes = 0;
 let gameActive = false;
 
 function randomNote() {
-  const pool = currentClef.notePool;
+  const pool = activeNotePool();
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
@@ -379,6 +410,38 @@ function buildNoteCountOptions() {
   }
 }
 
+function buildDifficultyOptions() {
+  difficultyOptionsEl.replaceChildren();
+  for (const d of DIFFICULTIES) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "difficulty-btn";
+    btn.dataset.difficulty = d.id;
+    btn.setAttribute("aria-pressed", "false");
+
+    const label = document.createElement("span");
+    label.className = "difficulty-name";
+    label.textContent = d.label;
+
+    const hint = document.createElement("span");
+    hint.className = "difficulty-hint";
+    hint.textContent = d.hint;
+
+    btn.append(label, hint);
+    difficultyOptionsEl.appendChild(btn);
+  }
+}
+
+function applyDifficulty(difficultyId) {
+  currentDifficulty =
+    DIFFICULTIES.find((d) => d.id === difficultyId) || DIFFICULTIES[1];
+  difficultyOptionsEl.querySelectorAll("[data-difficulty]").forEach((btn) => {
+    const active = btn.dataset.difficulty === currentDifficulty.id;
+    btn.classList.toggle("active", active);
+    btn.setAttribute("aria-pressed", String(active));
+  });
+}
+
 function buildNotePad() {
   if (!notePadEl) return;
   notePadEl.replaceChildren();
@@ -475,6 +538,13 @@ noteCountOptionsEl.addEventListener("click", (event) => {
   const btn = event.target.closest("[data-count]");
   if (!btn) return;
   beginGame(Number(btn.dataset.count));
+});
+
+difficultyOptionsEl.addEventListener("click", (event) => {
+  const btn = event.target.closest("[data-difficulty]");
+  if (!btn) return;
+  localStorage.setItem("difficulty", btn.dataset.difficulty);
+  applyDifficulty(btn.dataset.difficulty);
 });
 
 playAgainBtn.addEventListener("click", showSetup);
@@ -638,6 +708,8 @@ document.addEventListener("click", (e) => {
 });
 
 buildNoteCountOptions();
+buildDifficultyOptions();
+applyDifficulty(localStorage.getItem("difficulty") ?? DIFFICULTIES[1].id);
 buildNotePad();
 showSetup();
 

@@ -22,6 +22,8 @@ No build step, no package manager. Open `index.html` in a browser to run. The en
 
 **Note naming**: Finnish convention — the note B is called "h" (accepts both "h" and "b" as correct input).
 
+**Difficulty**: Three levels (`DIFFICULTIES` in `script.js`) that only change the range of notes drawn. Each level crops the active clef's `notePool` to a band of diatonic steps around the clef's middle staff line — easy stays on the staff, medium allows one ledger line either side, hard uses the whole pool. Chosen on the setup screen and persisted in `localStorage` under `"difficulty"`.
+
 **Theme system**: 8 themes (4 light, 4 dark) defined as `[data-theme="name"]` CSS blocks. JS sets the attribute on `<html>`. Theme choice persists in `localStorage` under key `"theme"`. Backward-compatible with legacy `"dark"`/`"light"` values.
 
 **Input**: Keyboard only — single letter keypress triggers `handleGuess()`. No on-screen buttons for note input.
