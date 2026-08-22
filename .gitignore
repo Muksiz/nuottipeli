@@ -1,0 +1,6 @@
+# Vite dev server cache (created by `vite .`)
+.vite/
+
+# In case vite is ever run with a local install or a build
+node_modules/
+dist/
