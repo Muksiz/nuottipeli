@@ -48,6 +48,24 @@
           ></div>
         </div>
         <div class="setup-group">
+          <button
+            type="button"
+            class="settings-toggle"
+            id="settings-toggle"
+            aria-expanded="false"
+            aria-controls="settings-panel"
+          >
+            Säädä nuottialueita
+          </button>
+          <div class="settings-panel" id="settings-panel" hidden>
+            <p class="settings-note" id="settings-clef-note"></p>
+            <div class="range-rows" id="range-rows"></div>
+            <button type="button" class="settings-reset" id="settings-reset">
+              Palauta oletukset
+            </button>
+          </div>
+        </div>
+        <div class="setup-group">
           <p class="setup-label" id="note-count-label">Nuottien määrä</p>
           <div
             class="note-count-options"

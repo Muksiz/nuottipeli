@@ -660,6 +660,116 @@ body {
   color: var(--note-current);
 }
 
+/* --- Note range settings --- */
+
+.settings-toggle {
+  font-family: inherit;
+  font-size: 0.85rem;
+  background: none;
+  border: none;
+  border-bottom: 1px dashed var(--toggle-border);
+  color: var(--status-label);
+  padding: 2px 0;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.settings-toggle:hover {
+  color: var(--note-current);
+  border-color: var(--note-current);
+}
+
+.settings-panel {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  width: 100%;
+  padding: 14px 12px;
+  border: 1px solid var(--toggle-border);
+  border-radius: 10px;
+  background: var(--toggle-bg);
+}
+
+.settings-note {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--status-label);
+}
+
+.range-rows {
+  display: grid;
+  gap: 14px;
+  width: 100%;
+}
+
+.range-row {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+}
+
+.range-row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.range-row-name {
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: 1rem;
+  color: var(--status-value);
+}
+
+.range-row-span {
+  font-size: 0.8rem;
+  letter-spacing: 0.04em;
+  color: var(--note-current);
+}
+
+/* The VexFlow staff fills the row; the hit areas are absolutely positioned
+   over it, one per note column. */
+.range-staff {
+  position: relative;
+  width: 100%;
+  line-height: 0;
+}
+
+.range-hit {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.range-hit:hover,
+.range-hit:focus-visible {
+  background: color-mix(in srgb, var(--note-current) 14%, transparent);
+  outline: none;
+}
+
+.settings-reset {
+  font-family: inherit;
+  font-size: 0.8rem;
+  background: none;
+  border: 1px solid var(--toggle-border);
+  border-radius: 8px;
+  color: var(--status-label);
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.settings-reset:hover {
+  color: var(--note-current);
+  border-color: var(--note-current);
+}
+
 .note-count-options {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -885,6 +995,10 @@ body {
 
   .difficulty-hint {
     font-size: 0.7rem;
+  }
+
+  .range-row-name {
+    font-size: 0.9rem;
   }
 }
 

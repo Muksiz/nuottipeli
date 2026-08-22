@@ -184,9 +184,9 @@ let currentClef = CLEFS[0];
 // spread 4 keeps every note on the staff itself, 6 allows one ledger line
 // above and below, and `null` means the whole pool — ledger lines included.
 const DIFFICULTIES = [
-  { id: "easy", label: "Helppo", hint: "Viivastolla", spread: 4 },
-  { id: "medium", label: "Keskitaso", hint: "1 apuviiva", spread: 6 },
-  { id: "hard", label: "Vaikea", hint: "Koko ala", spread: null },
+  { id: "easy", label: "Helppo", spread: 4 },
+  { id: "medium", label: "Keskitaso", spread: 6 },
+  { id: "hard", label: "Vaikea", spread: null },
 ];
 
 const DEFAULT_DIFFICULTY_ID = "medium";
@@ -204,19 +204,84 @@ function findDifficulty(difficultyId) {
 // drawn consistent with the highlighted button, whatever runs first.
 let currentDifficulty = findDifficulty(localStorage.getItem("difficulty"));
 
-// The notes actually in play: the current clef's pool cropped by the current
-// difficulty. Cropping (rather than listing a pool per clef per difficulty)
-// keeps a new clef working at every level as soon as its notePool is filled in.
-function activeNotePool() {
-  const { spread } = currentDifficulty;
-  if (spread === null) return currentClef.notePool;
-  const middle = diatonicStep(currentClef.middleLine);
-  const pool = currentClef.notePool.filter(
+// --- Note ranges ---
+// `spread` above is only the *default*. The player can widen or narrow any
+// level from the setup screen, and those choices are stored per clef and per
+// level (a range that makes sense in the treble clef would be nonsense in the
+// bass one) under localStorage key "noteRanges", as
+// { "<clefId>:<difficultyId>": { low, high } } note keys.
+const RANGE_STORAGE_KEY = "noteRanges";
+
+function loadRanges() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(RANGE_STORAGE_KEY));
+    return saved && typeof saved === "object" ? saved : {};
+  } catch {
+    // Corrupt or hand-edited storage shouldn't take the game down with it.
+    return {};
+  }
+}
+
+let noteRanges = loadRanges();
+
+function rangeKey(clefId, difficultyId) {
+  return `${clefId}:${difficultyId}`;
+}
+
+// The level's built-in range: the clef's pool cropped to a band centered on the
+// middle staff line, expressed as its lowest and highest note. Pools are listed
+// low to high, so the band's ends are its first and last entries.
+function defaultRange(clef, difficulty) {
+  const pool = clef.notePool;
+  if (pool.length === 0) return null;
+  const { spread } = difficulty;
+  if (spread === null) return { low: pool[0].key, high: pool.at(-1).key };
+  const middle = diatonicStep(clef.middleLine);
+  const inBand = pool.filter(
     (note) => Math.abs(diatonicStep(note.key) - middle) <= spread,
   );
   // A clef whose pool sits entirely outside the band would leave nothing to
   // draw; fall back to the full pool rather than an empty staff.
+  const band = inBand.length > 0 ? inBand : pool;
+  return { low: band[0].key, high: band.at(-1).key };
+}
+
+// The range in force for a clef/level pair: the saved one when it still names
+// notes this clef has, otherwise the default. Reversed ends are swapped rather
+// than rejected, so an out-of-order pick still yields a playable range.
+function rangeFor(clef, difficulty) {
+  const fallback = defaultRange(clef, difficulty);
+  const saved = noteRanges[rangeKey(clef.id, difficulty.id)];
+  if (!fallback || !saved) return fallback;
+  const keys = clef.notePool.map((note) => note.key);
+  if (!keys.includes(saved.low) || !keys.includes(saved.high)) return fallback;
+  return diatonicStep(saved.low) <= diatonicStep(saved.high)
+    ? { low: saved.low, high: saved.high }
+    : { low: saved.high, high: saved.low };
+}
+
+// The notes actually in play: the current clef's pool cropped to the range of
+// the current difficulty. Cropping (rather than listing a pool per clef per
+// difficulty) keeps a new clef working at every level as soon as its notePool
+// is filled in.
+function activeNotePool() {
+  const range = rangeFor(currentClef, currentDifficulty);
+  if (!range) return currentClef.notePool;
+  const low = diatonicStep(range.low);
+  const high = diatonicStep(range.high);
+  const pool = currentClef.notePool.filter((note) => {
+    const step = diatonicStep(note.key);
+    return step >= low && step <= high;
+  });
   return pool.length > 0 ? pool : currentClef.notePool;
+}
+
+// "b/4" in the treble pool reads as "H4": Finnish note name, uppercase, with
+// the octave number kept so two same-named notes stay tellable apart.
+function noteLabel(clef, key) {
+  const note = clef.notePool.find((n) => n.key === key);
+  const [letter, octave] = key.split("/");
+  return `${(note ? note.name : letter).toUpperCase()}${octave}`;
 }
 
 const notationEl = document.getElementById("notation");
@@ -231,6 +296,11 @@ const noteCountOptionsEl = document.getElementById("note-count-options");
 const difficultyOptionsEl = document.getElementById("difficulty-options");
 const resultsStatsEl = document.getElementById("results-stats");
 const resultsFaceEl = document.getElementById("results-face");
+const settingsToggle = document.getElementById("settings-toggle");
+const settingsPanel = document.getElementById("settings-panel");
+const settingsClefNote = document.getElementById("settings-clef-note");
+const rangeRowsEl = document.getElementById("range-rows");
+const settingsResetBtn = document.getElementById("settings-reset");
 const playAgainBtn = document.getElementById("play-again");
 const notePadEl = document.getElementById("note-pad");
 
@@ -436,13 +506,182 @@ function buildDifficultyOptions() {
     label.className = "difficulty-name";
     label.textContent = d.label;
 
+    // Filled in by refreshDifficultyHints, which reruns whenever the range or
+    // the clef changes.
     const hint = document.createElement("span");
     hint.className = "difficulty-hint";
-    hint.textContent = d.hint;
 
     btn.append(label, hint);
     difficultyOptionsEl.appendChild(btn);
   }
+}
+
+// Each level's button carries the span of notes it will actually draw, so a
+// customized range is visible without opening the settings panel.
+function refreshDifficultyHints() {
+  difficultyOptionsEl.querySelectorAll("[data-difficulty]").forEach((btn) => {
+    const hint = btn.querySelector(".difficulty-hint");
+    if (!hint) return;
+    const range = rangeFor(currentClef, findDifficulty(btn.dataset.difficulty));
+    hint.textContent = range
+      ? `${noteLabel(currentClef, range.low)}–${noteLabel(currentClef, range.high)}`
+      : "—";
+  });
+}
+
+// One row per level: the level's name and current span, above a staff showing
+// the clef's whole pool with the level's range highlighted. The staff is drawn
+// by renderRangeStaff once the row is in the document and has a width.
+function buildRangeRows() {
+  rangeRowsEl.replaceChildren();
+  settingsClefNote.textContent = `Napauta nuottia rajataksesi aluetta — avain ${currentClef.label}.`;
+
+  if (currentClef.notePool.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "settings-note";
+    empty.textContent = "Tällä avaimella ei ole vielä nuotteja.";
+    rangeRowsEl.appendChild(empty);
+    return;
+  }
+
+  for (const d of DIFFICULTIES) {
+    const range = rangeFor(currentClef, d);
+
+    const row = document.createElement("div");
+    row.className = "range-row";
+    row.dataset.difficulty = d.id;
+
+    const head = document.createElement("div");
+    head.className = "range-row-head";
+
+    const name = document.createElement("span");
+    name.className = "range-row-name";
+    name.textContent = d.label;
+
+    const span = document.createElement("span");
+    span.className = "range-row-span";
+    span.textContent = `${noteLabel(currentClef, range.low)}–${noteLabel(currentClef, range.high)}`;
+
+    head.append(name, span);
+
+    const staff = document.createElement("div");
+    staff.className = "range-staff";
+    staff.dataset.difficulty = d.id;
+
+    row.append(head, staff);
+    rangeRowsEl.appendChild(row);
+  }
+
+  renderRangeStaves();
+}
+
+// Draws every note of the pool on a staff of its own, in-range notes in the
+// current-note color and the rest faded, then lays a transparent button over
+// each note's column so the whole height of the staff is clickable — hitting a
+// notehead exactly would be hopeless on a phone.
+function renderRangeStaff(staffEl) {
+  const difficulty = findDifficulty(staffEl.dataset.difficulty);
+  const range = rangeFor(currentClef, difficulty);
+  const pool = currentClef.notePool;
+  if (!range || pool.length === 0) return;
+
+  staffEl.replaceChildren();
+
+  const width = staffEl.clientWidth || 600;
+  const height = 130;
+
+  const renderer = new Renderer(staffEl, Renderer.Backends.SVG);
+  renderer.resize(width, height);
+  const context = renderer.getContext();
+
+  const styles = getComputedStyle(document.documentElement);
+  const staffColor = styles.getPropertyValue("--staff-color").trim();
+  const ledgerColor = styles.getPropertyValue("--text").trim();
+  const inColor = styles.getPropertyValue("--note-current").trim();
+  const outColor = styles.getPropertyValue("--note-future").trim();
+  context.setFillStyle(staffColor);
+  context.setStrokeStyle(staffColor);
+
+  const staveWidth = width - 4;
+  const stave = new Stave(2, 22, staveWidth);
+  stave.addClef(currentClef.id);
+  stave.setDefaultLedgerLineStyle({
+    strokeStyle: ledgerColor,
+    fillStyle: ledgerColor,
+    lineWidth: 2,
+  });
+  stave.setContext(context).draw();
+
+  const low = diatonicStep(range.low);
+  const high = diatonicStep(range.high);
+
+  // Whole notes: no stems to clutter a staff that is a control, not music.
+  const staveNotes = pool.map((note) => {
+    const step = diatonicStep(note.key);
+    const inRange = step >= low && step <= high;
+    const sn = new StaveNote({
+      keys: [note.key],
+      duration: "w",
+      clef: currentClef.id,
+    });
+    const color = inRange ? inColor : outColor;
+    sn.setStyle({ fillStyle: color, strokeStyle: color });
+    return sn;
+  });
+
+  const voice = new Voice({ num_beats: pool.length * 4, beat_value: 4 });
+  voice.addTickables(staveNotes);
+  new Formatter().joinVoices([voice]).format([voice], staveWidth - 60);
+  voice.draw(context, stave);
+
+  // Column boundaries sit halfway between neighbouring noteheads, so every
+  // pixel of the staff belongs to exactly one note.
+  const xs = staveNotes.map((sn) => sn.getAbsoluteX());
+  pool.forEach((note, i) => {
+    const left = i === 0 ? 0 : (xs[i - 1] + xs[i]) / 2;
+    const right = i === pool.length - 1 ? width : (xs[i] + xs[i + 1]) / 2;
+    const step = diatonicStep(note.key);
+
+    const hit = document.createElement("button");
+    hit.type = "button";
+    hit.className = "range-hit";
+    hit.dataset.difficulty = difficulty.id;
+    hit.dataset.key = note.key;
+    hit.style.left = `${left}px`;
+    hit.style.width = `${right - left}px`;
+    hit.setAttribute("aria-pressed", String(step >= low && step <= high));
+    hit.setAttribute(
+      "aria-label",
+      `${difficulty.label}: ${noteLabel(currentClef, note.key)}`,
+    );
+    staffEl.appendChild(hit);
+  });
+}
+
+function renderRangeStaves() {
+  rangeRowsEl.querySelectorAll(".range-staff").forEach(renderRangeStaff);
+}
+
+// Clicking a note moves whichever end of the range is nearer to it: a note
+// outside the range pulls that end outward, one inside pushes it inward. The
+// range can shrink to a single note but never inverts.
+function setRangeFromNote(difficultyId, key) {
+  const difficulty = findDifficulty(difficultyId);
+  const range = rangeFor(currentClef, difficulty);
+  const step = diatonicStep(key);
+  const distLow = Math.abs(step - diatonicStep(range.low));
+  const distHigh = Math.abs(step - diatonicStep(range.high));
+  const edge = distLow <= distHigh ? "low" : "high";
+
+  const next = { ...range, [edge]: key };
+  if (diatonicStep(next.low) > diatonicStep(next.high)) {
+    next[edge === "low" ? "high" : "low"] = key;
+  }
+
+  noteRanges[rangeKey(currentClef.id, difficulty.id)] = next;
+  localStorage.setItem(RANGE_STORAGE_KEY, JSON.stringify(noteRanges));
+  buildRangeRows();
+  refreshDifficultyHints();
 }
 
 function applyDifficulty(difficultyId) {
@@ -452,6 +691,7 @@ function applyDifficulty(difficultyId) {
     btn.classList.toggle("active", active);
     btn.setAttribute("aria-pressed", String(active));
   });
+  refreshDifficultyHints();
 }
 
 function buildNotePad() {
@@ -559,6 +799,32 @@ difficultyOptionsEl.addEventListener("click", (event) => {
   applyDifficulty(btn.dataset.difficulty);
 });
 
+settingsToggle.addEventListener("click", () => {
+  const open = settingsPanel.hidden;
+  settingsPanel.hidden = !open;
+  settingsToggle.setAttribute("aria-expanded", String(open));
+  // A hidden panel has no width, so the staves can only be laid out once it is
+  // on screen.
+  if (open) renderRangeStaves();
+});
+
+rangeRowsEl.addEventListener("click", (event) => {
+  const hit = event.target.closest(".range-hit");
+  if (!hit) return;
+  setRangeFromNote(hit.dataset.difficulty, hit.dataset.key);
+});
+
+settingsResetBtn.addEventListener("click", () => {
+  // Only this clef's levels are cleared: the panel edits one clef at a time,
+  // so resetting all of them would be a surprise.
+  for (const d of DIFFICULTIES) {
+    delete noteRanges[rangeKey(currentClef.id, d.id)];
+  }
+  localStorage.setItem(RANGE_STORAGE_KEY, JSON.stringify(noteRanges));
+  buildRangeRows();
+  refreshDifficultyHints();
+});
+
 playAgainBtn.addEventListener("click", showSetup);
 
 notePadEl.addEventListener("click", (event) => {
@@ -569,6 +835,7 @@ notePadEl.addEventListener("click", (event) => {
 
 window.addEventListener("resize", () => {
   renderNotation();
+  if (!settingsPanel.hidden) renderRangeStaves();
 });
 
 const THEMES = [
@@ -623,6 +890,9 @@ function applyTheme(themeId) {
     btn.classList.toggle("active", btn.dataset.theme === theme.id);
   });
   renderNotation();
+  // Note colors are read from CSS at draw time, so the picker staves have to be
+  // redrawn for the new palette.
+  if (settingsPanel && !settingsPanel.hidden) renderRangeStaves();
 }
 
 buildThemeMenu();
@@ -688,6 +958,10 @@ function applyClef(clefId) {
   });
   // A single staff can only carry one clef, so switching mid-game would mix
   // incompatible note positions — restart the round with the new clef instead.
+  // Ranges are per clef, so both the panel and the level hints have to be
+  // redrawn for the clef that is now showing.
+  buildRangeRows();
+  refreshDifficultyHints();
   if (gameActive) {
     startGame();
   } else {
@@ -721,6 +995,7 @@ document.addEventListener("click", (e) => {
 
 buildNoteCountOptions();
 buildDifficultyOptions();
+buildRangeRows();
 applyDifficulty(currentDifficulty.id);
 buildNotePad();
 showSetup();
