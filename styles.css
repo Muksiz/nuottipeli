@@ -1141,6 +1141,46 @@ body {
   outline-offset: 4px;
 }
 
+/* Which way the deck is dealt: straight through, or shuffled. Two buttons
+   rather than a switch, because both states have a name — "in order" is a
+   choice, not the absence of one. It sits above the card: it decides what the
+   next card will be, so it belongs on the way in to the deck. */
+.card-order {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--toggle-border);
+  border-radius: 999px;
+  background: var(--notation-bg);
+}
+
+.card-order-btn {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  font-family: inherit;
+  font-size: 0.8rem;
+  color: var(--status-label);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.card-order-btn:hover {
+  color: var(--text);
+}
+
+.card-order-btn.active {
+  font-weight: 600;
+  background: var(--toggle-bg);
+  color: var(--note-current);
+}
+
+.card-order-btn:focus-visible {
+  outline: 2px solid var(--note-current);
+  outline-offset: 2px;
+}
+
 .deck-position {
   margin: 0;
   font-size: 0.85rem;

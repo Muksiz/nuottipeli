@@ -25,10 +25,10 @@ function getAudioContext() {
   return audioCtx;
 }
 
-// `delay` schedules the note that many seconds ahead on the audio clock rather
-// than on a timer, so a melody's notes keep time with each other.
-function playPianoNote(noteKey, duration = 1.2, delay = 0) {
-  const freq = noteFrequency(noteKey);
+// One struck string. `delay` schedules it that many seconds ahead on the audio
+// clock rather than on a timer, so the notes of a chord sound together; `gain`
+// is turned down for those, since three of them play at once.
+function playTone(freq, duration = 1.2, delay = 0, gain = 0.5) {
   if (!Number.isFinite(freq)) return;
 
   const ctx = getAudioContext();
@@ -42,7 +42,7 @@ function playPianoNote(noteKey, duration = 1.2, delay = 0) {
   ];
 
   const master = ctx.createGain();
-  master.gain.setValueAtTime(0.5, now);
+  master.gain.setValueAtTime(gain, now);
   master.connect(ctx.destination);
 
   for (const h of harmonics) {
@@ -60,6 +60,44 @@ function playPianoNote(noteKey, duration = 1.2, delay = 0) {
     osc.start(now);
     osc.stop(now + duration);
   }
+}
+
+function playPianoNote(noteKey, duration = 1.2, delay = 0) {
+  playTone(noteFrequency(noteKey), duration, delay);
+}
+
+// --- Triads ---
+// A key is heard as its tonic chord, and a signature belongs to two keys — the
+// major and the relative minor sharing it. So both are sounded, one after the
+// other, in the order the name reads: C major, then A minor.
+//
+// Built from semitone offsets off the major tonic's frequency rather than from
+// note keys, because the spellings would be the awkward part: the third of a
+// Cis major triad is Eis, and of an Ais minor one a plain Cis. What is being
+// taught here is the sound of the chord, not how it is written.
+const MAJOR_TRIAD = [0, 4, 7];
+const MINOR_TRIAD = [0, 3, 7];
+// Where the relative minor's tonic sits: a minor third below the major's.
+const RELATIVE_MINOR_SEMITONES = -3;
+// Long enough that the first chord is heard as a chord rather than as the front
+// of the second one.
+const TRIAD_GAP_SECONDS = 1.1;
+
+function playTriad(rootFreq, offsets, delay = 0) {
+  for (const semitones of offsets) {
+    playTone(rootFreq * 2 ** (semitones / 12), 1.5, delay, 0.3);
+  }
+}
+
+function playKeyTriads(key) {
+  const root = noteFrequency(key.tonic);
+  if (!Number.isFinite(root)) return;
+  playTriad(root, MAJOR_TRIAD);
+  playTriad(
+    root * 2 ** (RELATIVE_MINOR_SEMITONES / 12),
+    MINOR_TRIAD,
+    TRIAD_GAP_SECONDS,
+  );
 }
 
 function playErrorTone(duration = 0.35) {
@@ -301,20 +339,35 @@ const STRINGS = {
     "keys.prompt": "Mik\u00e4 s\u00e4vellaji?",
     "keys.progress": "S\u00e4vellaji {index} / {total}",
     "key.cf": "Ces",
+    "key.cf.minor": "as",
     "key.gf": "Ges",
+    "key.gf.minor": "es",
     "key.df": "Des",
+    "key.df.minor": "b",
     "key.af": "As",
+    "key.af.minor": "f",
     "key.ef": "Es",
+    "key.ef.minor": "c",
     "key.bf": "B",
+    "key.bf.minor": "g",
     "key.f": "F",
+    "key.f.minor": "d",
     "key.c": "C",
+    "key.c.minor": "a",
     "key.g": "G",
+    "key.g.minor": "e",
     "key.d": "D",
+    "key.d.minor": "h",
     "key.a": "A",
+    "key.a.minor": "fis",
     "key.e": "E",
+    "key.e.minor": "cis",
     "key.b": "H",
+    "key.b.minor": "gis",
     "key.fs": "Fis",
+    "key.fs.minor": "dis",
     "key.cs": "Cis",
+    "key.cs.minor": "ais",
     "game.correct": "Oikein",
     "game.wrong": "V\u00e4\u00e4rin",
     "game.streak": "Putki",
@@ -328,6 +381,9 @@ const STRINGS = {
     "results.accuracy": "Tarkkuus",
     "cards.title": "Nuottikortit",
     "cards.hint": "Paina v\u00e4lily\u00f6nti\u00e4 tai napauta korttia. Kortti vaihtuu itsest\u00e4\u00e4n.",
+    "cards.order": "Korttien j\u00e4rjestys",
+    "cards.inOrder": "J\u00e4rjestyksess\u00e4",
+    "cards.random": "Satunnainen",
     "cards.titleKeys": "S\u00e4vellajikortit",
     "cards.position": "Kortti {index} / {total}",
     "cards.empty": "T\u00e4ll\u00e4 avaimella ei ole viel\u00e4 nuotteja.",
@@ -389,20 +445,35 @@ const STRINGS = {
     "keys.prompt": "Vilken tonart?",
     "keys.progress": "Tonart {index} / {total}",
     "key.cf": "Cess",
+    "key.cf.minor": "ass",
     "key.gf": "Gess",
+    "key.gf.minor": "ess",
     "key.df": "Dess",
+    "key.df.minor": "b",
     "key.af": "Ass",
+    "key.af.minor": "f",
     "key.ef": "Ess",
+    "key.ef.minor": "c",
     "key.bf": "B",
+    "key.bf.minor": "g",
     "key.f": "F",
+    "key.f.minor": "d",
     "key.c": "C",
+    "key.c.minor": "a",
     "key.g": "G",
+    "key.g.minor": "e",
     "key.d": "D",
+    "key.d.minor": "h",
     "key.a": "A",
+    "key.a.minor": "fiss",
     "key.e": "E",
+    "key.e.minor": "ciss",
     "key.b": "H",
+    "key.b.minor": "giss",
     "key.fs": "Fiss",
+    "key.fs.minor": "diss",
     "key.cs": "Ciss",
+    "key.cs.minor": "aiss",
     "game.correct": "R\u00e4tt",
     "game.wrong": "Fel",
     "game.streak": "I rad",
@@ -416,6 +487,9 @@ const STRINGS = {
     "results.accuracy": "Tr\u00e4ffs\u00e4kerhet",
     "cards.title": "Notkort",
     "cards.hint": "Tryck p\u00e5 mellanslag eller p\u00e5 kortet. Kortet byts av sig sj\u00e4lvt.",
+    "cards.order": "Kortens ordning",
+    "cards.inOrder": "I ordning",
+    "cards.random": "Slumpm\u00e4ssig",
     "cards.titleKeys": "Tonartskort",
     "cards.position": "Kort {index} / {total}",
     "cards.empty": "Den h\u00e4r klaven har inga noter \u00e4nnu.",
@@ -684,6 +758,7 @@ const cardsScreen = document.getElementById("cards-screen");
 const noteCardsEl = document.getElementById("note-cards");
 const cardsTitleEl = document.getElementById("cards-title");
 const cardsPositionEl = document.getElementById("cards-position");
+const cardOrderEl = document.getElementById("card-order");
 const playAgainBtn = document.getElementById("play-again");
 const notePadEl = document.getElementById("note-pad");
 
@@ -1768,6 +1843,16 @@ const KEYS = [
   { id: "cs", vf: "C#", accidentals: 7, tonic: "c#/4" },
 ];
 
+// A signature belongs to two keys, so it is named as both: the major, then the
+// minor a minor third below it, which the same accidentals spell. Major
+// uppercase and minor lowercase is the Nordic convention and the whole of the
+// distinction — "C-a" is C major and A minor, "Des-b" is Des major and B minor
+// (Nordic B being B flat). Both halves are translated, since Finnish and
+// Swedish spell the altered degrees differently.
+function keyName(key) {
+  return `${t(`key.${key.id}`)}-${t(`key.${key.id}.minor`)}`;
+}
+
 // Staff left past the signature, so it reads as a staff carrying one rather
 // than as a signature cropped out of one.
 const KEY_STAVE_TRAILING = 44;
@@ -1880,7 +1965,7 @@ function renderKeyChoices() {
 
     const name = document.createElement("span");
     name.className = "key-option-name";
-    name.textContent = t(`key.${key.id}`);
+    name.textContent = keyName(key);
 
     btn.appendChild(name);
     keyOptionsEl.appendChild(btn);
@@ -1903,7 +1988,7 @@ function handleKeyGuess(keyId) {
   if (!question) return;
 
   if (keyId === question.key.id) {
-    playPianoNote(question.key.tonic);
+    playKeyTriads(question.key);
     correct += 1;
     streak += 1;
     currentIndex += 1;
@@ -2049,7 +2134,7 @@ function buildKeyChartTile(key, staveWidth) {
 
   const name = document.createElement("span");
   name.className = "key-chart-name";
-  name.textContent = t(`key.${key.id}`);
+  name.textContent = keyName(key);
   tile.appendChild(name);
 
   return tile;
@@ -2074,15 +2159,16 @@ function widestKeySignature() {
 }
 
 // Grouped the way a signature is actually looked up: the sharp keys in order
-// of how many sharps they carry, then the flat ones. C major sits at the head
-// of the sharps, being nought of them, rather than being listed twice.
+// of how many sharps they carry, then the flat ones in order of their flats.
+// Both columns start at C, which carries neither — a column that opened on one
+// flat would read as though the counting started at one.
 function renderKeyChart() {
   keyChartEl.replaceChildren();
 
   const staveWidth = widestKeySignature();
   const groups = [
     ["chart.sharps", KEYS.filter((key) => key.accidentals >= 0)],
-    ["chart.flats", [...KEYS.filter((key) => key.accidentals < 0)].reverse()],
+    ["chart.flats", [...KEYS.filter((key) => key.accidentals <= 0)].reverse()],
   ];
 
   for (const [labelKey, keys] of groups) {
@@ -2204,10 +2290,66 @@ function scaleCardSvg(faceEl, width, height) {
   svg.style.height = "";
 }
 
-// Which card of the deck is showing. Kept across redraws — a theme change
-// should not send the player back to the first card — and clamped by
+// --- The order the deck is worked through ---
+// Straight through it, or shuffled. Shuffled asks the same thing of the player
+// that the note game does: with no telling what is coming, there is a moment to
+// name the card to yourself before turning it over. It is a shuffle rather than
+// a draw, so every card still comes up once before any comes up twice — the
+// deck is a deck, not a bag. The choice persists under "cardOrder", and it
+// works both decks, since the control sits on the screen they share.
+const CARD_ORDER_STORAGE_KEY = "cardOrder";
+let cardShuffle = localStorage.getItem(CARD_ORDER_STORAGE_KEY) === "random";
+
+// Positions into cardDeck(), in the order the cards come out: deck order
+// itself, or a shuffle of it. renderCards rebuilds it whenever the deck it
+// indexes into has changed length underneath it.
+let cardOrder = [];
+
+// `avoidFirst` is the position just seen, where there is one: a reshuffle that
+// deals the same card again reads as the deck having stuck rather than as
+// chance, so it is moved one place down.
+function resetCardOrder(avoidFirst = null) {
+  const positions = cardDeck().map((_, i) => i);
+  cardOrder = cardShuffle ? shuffled(positions) : positions;
+  if (cardOrder.length > 1 && cardOrder[0] === avoidFirst) {
+    [cardOrder[0], cardOrder[1]] = [cardOrder[1], cardOrder[0]];
+  }
+}
+
+// Which card of the deck is showing. cardIndex counts through the order, and
+// the order is what points into the deck. It is kept across redraws — a theme
+// change should not send the player back to the first card — and clamped by
 // renderCards when the deck it indexes into gets shorter.
 let cardIndex = 0;
+
+function currentCard() {
+  return cardDeck()[cardOrder[cardIndex]];
+}
+
+function markCardOrder() {
+  cardOrderEl.querySelectorAll("[data-order]").forEach((btn) => {
+    const active = (btn.dataset.order === "random") === cardShuffle;
+    btn.classList.toggle("active", active);
+    btn.setAttribute("aria-checked", String(active));
+  });
+}
+
+function applyCardOrder(order) {
+  cardShuffle = order === "random";
+  localStorage.setItem(CARD_ORDER_STORAGE_KEY, order);
+  markCardOrder();
+  // The new order starts at its own first card: a position counted through an
+  // order that no longer holds would point at nothing in particular.
+  cardIndex = 0;
+  resetCardOrder();
+  redrawCards();
+}
+
+cardOrderEl.addEventListener("click", (event) => {
+  const btn = event.target.closest("[data-order]");
+  if (!btn) return;
+  applyCardOrder(btn.dataset.order);
+});
 
 function renderCards() {
   noteCardsEl.replaceChildren();
@@ -2224,8 +2366,11 @@ function renderCards() {
   }
 
   const deck = cardDeck();
+  // The deck can have changed length since the order was dealt — a narrowed
+  // range, or the other deck entirely.
+  if (cardOrder.length !== deck.length) resetCardOrder();
   cardIndex = Math.min(Math.max(cardIndex, 0), deck.length - 1);
-  const entry = deck[cardIndex];
+  const entry = deck[cardOrder[cardIndex]];
 
   const card = document.createElement("button");
   card.type = "button";
@@ -2242,10 +2387,9 @@ function renderCards() {
   name.className = "note-card-name";
 
   if (cardMode === "keys") {
-    card.dataset.tonic = entry.tonic;
-    card.setAttribute("aria-label", t(`key.${entry.id}`));
+    card.setAttribute("aria-label", keyName(entry));
     renderCardKeySignature(front, entry);
-    name.textContent = t(`key.${entry.id}`);
+    name.textContent = keyName(entry);
   } else {
     card.dataset.tonic = entry.key;
     // The drawing on the front is out of a screen reader's reach, so the
@@ -2288,7 +2432,13 @@ function renderCards() {
 function stepCard(delta) {
   const total = cardDeck().length;
   if (total === 0) return;
-  cardIndex = (cardIndex + delta + total) % total;
+  const next = cardIndex + delta;
+  // Off the end and round again. A shuffled deck is dealt afresh at that point,
+  // so a second pass is a second order rather than a rerun of the first.
+  if (cardShuffle && (next >= total || next < 0)) {
+    resetCardOrder(cardOrder[cardIndex]);
+  }
+  cardIndex = (next + total) % total;
   renderCards();
 }
 
@@ -2328,8 +2478,13 @@ function revealOrAdvance() {
   card.classList.add("flipped");
   card.setAttribute("aria-pressed", "true");
   // Hearing the card alongside its name is half of what the deck is for: the
-  // note itself, or the note a key is built on.
-  playPianoNote(card.dataset.tonic);
+  // note itself, or — since a key card names two keys — the two chords built on
+  // the tonics it names.
+  if (cardMode === "keys") {
+    playKeyTriads(currentCard());
+  } else {
+    playPianoNote(card.dataset.tonic);
+  }
   cardAdvanceTimer = setTimeout(() => {
     cardAdvanceTimer = null;
     stepCard(1);
@@ -2402,6 +2557,8 @@ function showCards(mode = "notes") {
     mode === "keys" ? "cards.titleKeys" : "cards.title";
   cardsTitleEl.textContent = t(cardsTitleEl.dataset.i18n);
   cardIndex = 0;
+  // A shuffled deck is dealt afresh every time it is opened.
+  resetCardOrder();
   renderCards();
   showScreen(cardsScreen);
 }
@@ -2912,6 +3069,7 @@ document.addEventListener("keydown", (e) => {
 buildNoteCountOptions();
 buildRangeEditor();
 buildNotePad();
+markCardOrder();
 // Last, so it can rebuild every menu above in the saved language.
 applyLanguage(currentLanguage.id);
 showMenu();
