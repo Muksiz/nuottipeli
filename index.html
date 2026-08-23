@@ -165,6 +165,20 @@
               </span>
             </button>
           </section>
+          <section class="menu-group" aria-labelledby="menu-group-intervals">
+            <h2 class="menu-group-heading" id="menu-group-intervals" data-i18n="menu.groupIntervals">
+              Intervallit
+            </h2>
+            <button type="button" class="menu-item" id="menu-intervals">
+              <span class="menu-icon" aria-hidden="true">⇕</span>
+              <span class="menu-text">
+                <span class="menu-name" data-i18n="menu.intervals">Tunnista intervalli</span>
+                <span class="menu-note" data-i18n="menu.intervalsNote">
+                  Nimeä kahden nuotin väli.
+                </span>
+              </span>
+            </button>
+          </section>
         </div>
       </section>
 
@@ -273,7 +287,7 @@
       <section class="screen game keys-screen" id="keys-screen" hidden>
         <div class="progress" id="keys-progress"></div>
         <div class="notation-area" id="keys-notation" aria-live="polite"></div>
-        <p class="keys-prompt" id="keys-prompt" data-i18n="keys.prompt">
+        <p class="game-prompt" id="keys-prompt" data-i18n="keys.prompt">
           Mikä sävellaji?
         </p>
         <div
@@ -294,6 +308,34 @@
           <div class="status-row">
             <span data-i18n="game.streak">Putki</span>
             <strong id="keys-streak">0</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen game intervals-screen" id="intervals-screen" hidden>
+        <div class="progress" id="intervals-progress"></div>
+        <div class="notation-area" id="intervals-notation" aria-live="polite"></div>
+        <p class="game-prompt" id="intervals-prompt" data-i18n="intervals.prompt">
+          Mikä intervalli?
+        </p>
+        <div
+          class="interval-options"
+          id="interval-options"
+          role="group"
+          aria-labelledby="intervals-prompt"
+        ></div>
+        <div class="status">
+          <div class="status-row">
+            <span data-i18n="game.correct">Oikein</span>
+            <strong id="intervals-score">0</strong>
+          </div>
+          <div class="status-row">
+            <span data-i18n="game.wrong">Väärin</span>
+            <strong id="intervals-mistakes">0</strong>
+          </div>
+          <div class="status-row">
+            <span data-i18n="game.streak">Putki</span>
+            <strong id="intervals-streak">0</strong>
           </div>
         </div>
       </section>

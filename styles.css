@@ -873,14 +873,23 @@ body {
    saying in a line what it is for. Two columns where there is room, one where
    there is not. */
 
-/* Two columns, one per subject: everything about notes on the left, everything
-   about keys on the right. Each column is a group of its own rather than a run
-   of rows, so the pairing reads down the column instead of across. */
+/* One column per subject: notes, keys, intervals. Each column is a group of
+   its own rather than a run of rows, so the pairing reads down the column
+   instead of across. */
 .main-menu {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
   width: 100%;
+}
+
+/* Three columns inside the 720px card leave each about 210px — close to what
+   two of them came to on the narrowest screen that still showed two, so the
+   entries read the same. Below that they stack, headings and all. */
+@media (max-width: 760px) {
+  .main-menu {
+    grid-template-columns: 1fr;
+  }
 }
 
 .menu-group {
@@ -1286,7 +1295,9 @@ body {
 /* The staff carries only a clef and the accidentals; everything the player has
    to weigh up is in those, so the answers get the room instead. */
 
-.keys-prompt {
+/* The one line of the question that is words rather than notation. Shared by
+   the key game and the interval game, so it is named for neither. */
+.game-prompt {
   margin: 0;
   font-family: "DM Serif Display", Georgia, serif;
   font-size: 1.35rem;
@@ -1336,9 +1347,69 @@ body {
 
 /* A wrong pick shakes where it was pressed, so the answer that was rejected is
    the one that moves — the staff shakes too, but it is not what was aimed at. */
-.key-option.wrong {
+.key-option.wrong,
+.interval-option.wrong {
   animation: wrong-shake 400ms ease;
   border-color: var(--note-current);
+}
+
+/* The eight interval names, in their own order and never in any other: the
+   answer is a count, not one of four things it might be, so the pad stays put
+   and 5 is always in the same place. Four across on every screen — eight in a
+   row would shrink the names past reading, two would run the pad down the
+   page. */
+.interval-options {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  width: 100%;
+}
+
+.interval-option {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  font: inherit;
+  padding: 10px 6px;
+  background: var(--toggle-bg);
+  border: 1px solid var(--toggle-border);
+  border-radius: 12px;
+  color: var(--status-value);
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.interval-option:hover {
+  transform: translateY(-2px);
+  border-color: var(--note-current);
+  color: var(--note-current);
+}
+
+.interval-option:hover .interval-option-name {
+  color: inherit;
+}
+
+.interval-option:active {
+  transform: translateY(0);
+}
+
+.interval-option:focus-visible {
+  outline: 2px solid var(--note-current);
+  outline-offset: 2px;
+}
+
+/* The numeral is the answer and the name is what it is called, so the numeral
+   is the one that carries — and it is the key that answers it, too. */
+.interval-option-number {
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.interval-option-name {
+  font-size: 0.72rem;
+  line-height: 1.2;
+  color: var(--status-label);
 }
 
 /* Rounds of a fixed length like the numbers above them, but tunes rather than
@@ -1456,7 +1527,8 @@ body {
     animation: none;
   }
 
-  .key-option.wrong {
+  .key-option.wrong,
+  .interval-option.wrong {
     animation: none;
   }
 }
@@ -1636,10 +1708,6 @@ body {
 
   .key-chart-grid {
     grid-template-columns: repeat(2, 1fr);
-  }
-
-  .main-menu {
-    grid-template-columns: 1fr;
   }
 
   .note-card-slot {

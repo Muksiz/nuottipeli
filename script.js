@@ -317,9 +317,13 @@ const STRINGS = {
     "menu.keyCardsNote": "Selaa s\u00e4vellajeja kortteina ja k\u00e4\u00e4nn\u00e4 nimi esiin.",
     "menu.keys": "Tunnista s\u00e4vellaji",
     "menu.keysNote": "P\u00e4\u00e4ttele s\u00e4vellaji etumerkinn\u00e4st\u00e4.",
+    "menu.groupIntervals": "Intervallit",
+    "menu.intervals": "Tunnista intervalli",
+    "menu.intervalsNote": "Nime\u00e4 kahden nuotin v\u00e4li.",
     "nav.back": "Takaisin",
     "setup.title": "Valitse nuottien m\u00e4\u00e4r\u00e4.",
     "setup.titleKeys": "Valitse s\u00e4vellajien m\u00e4\u00e4r\u00e4.",
+    "setup.titleIntervals": "Valitse intervallien m\u00e4\u00e4r\u00e4.",
     "setup.played": "{label} \u2014 pelattu l\u00e4pi",
     "setup.melodyHeading": "Tai soita koko s\u00e4velm\u00e4",
     "melody.mary-lamb": "Maijall' oli karitsa",
@@ -368,6 +372,17 @@ const STRINGS = {
     "key.fs.minor": "dis",
     "key.cs": "Cis",
     "key.cs.minor": "ais",
+    "intervals.prompt": "Mik\u00e4 intervalli?",
+    "intervals.progress": "Intervalli {index} / {total}",
+    "intervals.options": "Intervallipainikkeet",
+    "interval.1": "priimi",
+    "interval.2": "sekunti",
+    "interval.3": "terssi",
+    "interval.4": "kvartti",
+    "interval.5": "kvintti",
+    "interval.6": "seksti",
+    "interval.7": "septimi",
+    "interval.8": "oktaavi",
     "game.correct": "Oikein",
     "game.wrong": "V\u00e4\u00e4rin",
     "game.streak": "Putki",
@@ -423,9 +438,13 @@ const STRINGS = {
     "menu.keyCardsNote": "Bl\u00e4ddra bland tonarterna som kort och v\u00e4nd fram namnet.",
     "menu.keys": "K\u00e4nn igen tonarten",
     "menu.keysNote": "Lista ut tonarten utifr\u00e5n f\u00f6rtecknen.",
+    "menu.groupIntervals": "Intervall",
+    "menu.intervals": "K\u00e4nn igen intervallet",
+    "menu.intervalsNote": "Namnge avst\u00e5ndet mellan tv\u00e5 noter.",
     "nav.back": "Tillbaka",
     "setup.title": "V\u00e4lj antal noter.",
     "setup.titleKeys": "V\u00e4lj antal tonarter.",
+    "setup.titleIntervals": "V\u00e4lj antal intervall.",
     "setup.played": "{label} \u2014 genomspelad",
     "setup.melodyHeading": "Eller spela en hel melodi",
     "melody.mary-lamb": "Mary hade ett litet lamm",
@@ -474,6 +493,17 @@ const STRINGS = {
     "key.fs.minor": "diss",
     "key.cs": "Ciss",
     "key.cs.minor": "aiss",
+    "intervals.prompt": "Vilket intervall?",
+    "intervals.progress": "Intervall {index} / {total}",
+    "intervals.options": "Intervallknappar",
+    "interval.1": "prim",
+    "interval.2": "sekund",
+    "interval.3": "ters",
+    "interval.4": "kvart",
+    "interval.5": "kvint",
+    "interval.6": "sext",
+    "interval.7": "septim",
+    "interval.8": "oktav",
     "game.correct": "R\u00e4tt",
     "game.wrong": "Fel",
     "game.streak": "I rad",
@@ -750,6 +780,13 @@ const keysProgressEl = document.getElementById("keys-progress");
 const keysScoreEl = document.getElementById("keys-score");
 const keysMistakesEl = document.getElementById("keys-mistakes");
 const keysStreakEl = document.getElementById("keys-streak");
+const intervalsScreen = document.getElementById("intervals-screen");
+const intervalsNotationEl = document.getElementById("intervals-notation");
+const intervalOptionsEl = document.getElementById("interval-options");
+const intervalsProgressEl = document.getElementById("intervals-progress");
+const intervalsScoreEl = document.getElementById("intervals-score");
+const intervalsMistakesEl = document.getElementById("intervals-mistakes");
+const intervalsStreakEl = document.getElementById("intervals-streak");
 const noteChartScreen = document.getElementById("note-chart-screen");
 const noteChartRowsEl = document.getElementById("note-chart-rows");
 const keyChartScreen = document.getElementById("key-chart-screen");
@@ -960,30 +997,41 @@ function triggerFeedback(type, target = notationEl) {
   target.classList.add(type === "correct" ? "anim-correct" : "anim-wrong");
 }
 
-for (const area of [notationEl, keysNotationEl]) {
+for (const area of [notationEl, keysNotationEl, intervalsNotationEl]) {
   area.addEventListener("animationend", () => {
     area.classList.remove("anim-correct", "anim-wrong");
   });
 }
 
-// The two games keep a status block each — same three counters, on their own
-// screen — so the one being played is the one written to.
+// The games keep a status block each — same three counters, on their own
+// screen — so the one being played is the one written to. Keyed by gameMode,
+// since with three of them a chain of ternaries no longer reads as a table.
+const STATUS_BLOCKS = {
+  notes: {
+    score: scoreEl,
+    mistakes: mistakesEl,
+    streak: streakEl,
+    progress: progressEl,
+    progressKey: "game.progress",
+  },
+  keys: {
+    score: keysScoreEl,
+    mistakes: keysMistakesEl,
+    streak: keysStreakEl,
+    progress: keysProgressEl,
+    progressKey: "keys.progress",
+  },
+  intervals: {
+    score: intervalsScoreEl,
+    mistakes: intervalsMistakesEl,
+    streak: intervalsStreakEl,
+    progress: intervalsProgressEl,
+    progressKey: "intervals.progress",
+  },
+};
+
 function statusElements() {
-  return gameMode === "keys"
-    ? {
-        score: keysScoreEl,
-        mistakes: keysMistakesEl,
-        streak: keysStreakEl,
-        progress: keysProgressEl,
-        progressKey: "keys.progress",
-      }
-    : {
-        score: scoreEl,
-        mistakes: mistakesEl,
-        streak: streakEl,
-        progress: progressEl,
-        progressKey: "game.progress",
-      };
+  return STATUS_BLOCKS[gameMode] ?? STATUS_BLOCKS.notes;
 }
 
 function updateStatus() {
@@ -2034,6 +2082,362 @@ keyOptionsEl.addEventListener("animationend", (event) => {
   event.target.classList.remove("wrong");
 });
 
+// --- Interval game ---
+// The distance between two notes, named as the number it is: a terssi spans
+// three letters, a kvintti five. That number is the whole answer, so the pad
+// below the staff carries the eight of them in their own order and the number
+// key that answers one is the number written on it — press 5 for a kvintti.
+// Nothing here reshuffles between questions, unlike the key game's four
+// choices: an interval's name is not one of four things it might be, it is a
+// count, so the answer sits in the same place every time and the pad becomes a
+// keyboard rather than a quiz.
+//
+// The number only, never the quality: every note in every pool is a natural and
+// no staff here carries a key signature, so "suuri" or "pieni" would be a
+// semitone count laid over a step count. Counting the lines and spaces is the
+// skill this app is for.
+const INTERVAL_SIZES = [1, 2, 3, 4, 5, 6, 7, 8];
+
+// A right answer is answered back with the count itself: the second note drops
+// onto the first and climbs to its place a step at a time, sounding each rung
+// and leaving its number beside it, so 1-2-3-4-5 is seen and heard on the way
+// to "kvintti". The step is fast enough that a long round is not held up by it,
+// and any answer key cuts it short anyway.
+const INTERVAL_WALK_STEP_MS = 320;
+// The beat at the top, after the two notes have sounded together, before the
+// next question replaces them.
+const INTERVAL_WALK_HOLD_MS = 750;
+
+// Where the two notes go, measured from where the clef leaves off: the first
+// note's inset, the gap to the second, and the staff left past it — which is
+// what the count written beside the climbing note stands in — kept there
+// during the question too, so the staff does not resize the moment an answer
+// is given. The notes are
+// placed by hand rather than formatted, the way the range editor's are: a
+// Formatter given two notes and a width of its own choosing crowds them both
+// against the clef and leaves the rest of the staff empty.
+const INTERVAL_NOTE_INSET = 18;
+const INTERVAL_NOTE_GAP = 66;
+const INTERVAL_NOTE_TRAILING = 70;
+
+// Which sizes the range can actually hold. A pool is a run of consecutive
+// diatonic steps, so it holds an interval of `size` exactly when it has that
+// many notes: a range cropped to five notes tops out at a kvintti, and the game
+// simply stops asking for more rather than posing a question with no answer.
+function availableIntervalSizes(pool) {
+  return INTERVAL_SIZES.filter((size) => size <= pool.length);
+}
+
+// The size is drawn first and the notes fitted to it, rather than two notes
+// drawn and the size read off them: picking two notes at random out of a pool
+// leans hard toward the small intervals, since there are far more pairs a
+// sekunti apart than an oktaavi.
+function makeIntervalQuestion() {
+  const pool = activeNotePool();
+  const sizes = availableIntervalSizes(pool);
+  if (sizes.length === 0) return null;
+
+  const size = sizes[Math.floor(Math.random() * sizes.length)];
+  const bottom = Math.floor(Math.random() * (pool.length - size + 1));
+  // Every note from one end to the other, not just the two that are written:
+  // the rungs are what the reveal climbs and counts, and a pool is a run of
+  // consecutive steps, so they are simply the slice between them.
+  const ladder = pool.slice(bottom, bottom + size);
+  // Read downward as often as upward: the count is the same either way, and a
+  // player who only ever reads upward has learned half of it. A priimi is the
+  // same note whichever way round it goes.
+  const descending = size > 1 && Math.random() < 0.5;
+  return { size, ladder: descending ? [...ladder].reverse() : ladder };
+}
+
+// One entry per question, built on demand and kept: a question the player is
+// still getting wrong must keep the same two notes underneath them.
+let intervalQuestions = [];
+
+function ensureIntervalQuestion(index) {
+  while (intervalQuestions.length <= index) {
+    const question = makeIntervalQuestion();
+    if (!question) return null;
+    intervalQuestions.push(question);
+  }
+  return intervalQuestions[index];
+}
+
+// The reveal in progress: null while a question is still open, otherwise the
+// question being answered back and how many rungs the climbing note has taken.
+// It holds its own question rather than reading the round's, because the round
+// does not move on until the climb is over — the progress line should still say
+// which interval is on the staff.
+let intervalWalk = null;
+let intervalWalkTimer = null;
+
+function clearIntervalWalk() {
+  if (intervalWalkTimer !== null) clearTimeout(intervalWalkTimer);
+  intervalWalkTimer = null;
+  intervalWalk = null;
+}
+
+// Which staff line a note sits on. Line 0 is the top line and one line is two
+// diatonic steps, so the clef's middle line — line 2 — is what everything is
+// measured from. Used to put the count beside the rung it belongs to.
+function staveLineFor(noteKey) {
+  return (
+    2 - (diatonicStep(noteKey) - diatonicStep(currentClef.middleLine)) / 2
+  );
+}
+
+// How far right of the climbing notehead the count is written, clear of a stem
+// on either side of the head, and how big.
+const INTERVAL_COUNT_OFFSET = 26;
+const INTERVAL_COUNT_SIZE = 19;
+
+// The count so far, beside the rung the climb has reached and moving with it:
+// 1 where the two notes are level, 5 when the second has got where it was
+// written. One numeral rather than the whole ladder left behind, because
+// consecutive rungs are five pixels apart — a column of numbers that close
+// together is a smudge, not a count.
+function drawIntervalCount(context, stave, x, walk) {
+  const styles = getComputedStyle(document.documentElement);
+  const color = styles.getPropertyValue("--note-current").trim();
+  context.setFont("DM Serif Display, Georgia, serif", INTERVAL_COUNT_SIZE);
+  context.setFillStyle(color);
+  context.setStrokeStyle(color);
+  context.fillText(
+    String(walk.step + 1),
+    x + INTERVAL_COUNT_OFFSET,
+    // The baseline sits a touch below the notehead's centre.
+    stave.getYForLine(staveLineFor(walk.question.ladder[walk.step].key)) + 7,
+  );
+}
+
+// Both notes wear the current-note colour: neither one is the answer, the gap
+// between them is, so there is no past and future to tell apart here.
+function renderIntervalNotation() {
+  intervalsNotationEl.replaceChildren();
+
+  const available = intervalsNotationEl.clientWidth || 700;
+  // The same height the note game uses, so the staff does not jump between the
+  // two: the pool reaches two ledger lines either side of the staff.
+  const height = 180;
+
+  const renderer = new Renderer(intervalsNotationEl, Renderer.Backends.SVG);
+  const context = renderer.getContext();
+
+  const styles = getComputedStyle(document.documentElement);
+  const staffColor = styles.getPropertyValue("--staff-color").trim();
+  const ledgerColor = styles.getPropertyValue("--text").trim();
+  context.setFillStyle(staffColor);
+  context.setStrokeStyle(staffColor);
+
+  // How much room the clef takes, measured off a stave that is never drawn —
+  // the F clef and the G clef are not the same width, and the notes start
+  // wherever the one being shown ends.
+  const probe = new Stave(0, 0, available);
+  probe.addClef(currentClef.id);
+  probe.setContext(context);
+  const noteStart = probe.getNoteStartX();
+  const staveWidth = Math.min(
+    available - 20,
+    noteStart + INTERVAL_NOTE_INSET + INTERVAL_NOTE_GAP + INTERVAL_NOTE_TRAILING,
+  );
+  renderer.resize(staveWidth + 20, height);
+
+  const stave = new Stave(10, 30, staveWidth);
+  stave.addClef(currentClef.id);
+  // Same reason as the note game's: VexFlow's default ledger grey vanishes on
+  // the dark themes.
+  stave.setDefaultLedgerLineStyle({
+    strokeStyle: ledgerColor,
+    fillStyle: ledgerColor,
+    lineWidth: 2,
+  });
+  stave.setContext(context).draw();
+
+  const question = intervalWalk
+    ? intervalWalk.question
+    : intervalQuestions[currentIndex];
+  // The clef is drawn but the pool is empty, so there is no interval to pose.
+  if (!question) {
+    const hint = document.createElement("p");
+    hint.className = "clef-empty-hint";
+    hint.textContent = t("game.emptyPool");
+    intervalsNotationEl.appendChild(hint);
+    return;
+  }
+
+  // The written question is the two ends of the ladder. During the reveal the
+  // second note is wherever the climb has got to — at the first rung it is the
+  // first note's own pitch, which is what makes the climb read as one.
+  const climbing = intervalWalk
+    ? question.ladder[intervalWalk.step]
+    : question.ladder.at(-1);
+
+  const color = styles.getPropertyValue("--note-current").trim();
+  const staveNotes = [question.ladder[0], climbing].map((note, i) => {
+    const stemDown =
+      diatonicStep(note.key) >= diatonicStep(currentClef.middleLine);
+    const sn = new StaveNote({
+      keys: [note.key],
+      duration: "q",
+      clef: currentClef.id,
+      stem_direction: stemDown ? -1 : 1,
+    });
+    sn.setStyle({ fillStyle: color, strokeStyle: color });
+    sn.setContext(context).setStave(stave);
+    // A tick context each, so the x is ours to set — the same handling the
+    // range editor gives its notes, and for the same reason.
+    new TickContext()
+      .addTickable(sn)
+      .preFormat()
+      .setX(INTERVAL_NOTE_INSET + i * INTERVAL_NOTE_GAP);
+    sn.draw();
+    return sn;
+  });
+
+  if (intervalWalk) {
+    drawIntervalCount(context, stave, staveNotes[1].getAbsoluteX(), intervalWalk);
+  }
+}
+
+// The eight answers, in their own order and never in any other. Rebuilt on a
+// language change, since each carries the interval's name under its numeral.
+function buildIntervalOptions() {
+  intervalOptionsEl.replaceChildren();
+  for (const size of INTERVAL_SIZES) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "interval-option";
+    btn.dataset.interval = String(size);
+
+    const numeral = document.createElement("span");
+    numeral.className = "interval-option-number";
+    numeral.textContent = String(size);
+
+    const name = document.createElement("span");
+    name.className = "interval-option-name";
+    name.textContent = t(`interval.${size}`);
+
+    btn.append(numeral, name);
+    intervalOptionsEl.appendChild(btn);
+  }
+}
+
+// The two ends sounded together at the top of the climb: the count just made,
+// heard in one go as the thing it was counting.
+function playIntervalTogether(question) {
+  playPianoNote(question.ladder[0].key);
+  playPianoNote(question.ladder.at(-1).key);
+}
+
+// Starts the reveal: the second note back down on the first, and then a rung
+// every INTERVAL_WALK_STEP_MS until it is home.
+function startIntervalWalk(question) {
+  clearIntervalWalk();
+  intervalWalk = { question, step: 0 };
+  playPianoNote(question.ladder[0].key, 0.9);
+  renderIntervalNotation();
+  scheduleIntervalWalkStep();
+}
+
+function scheduleIntervalWalkStep() {
+  intervalWalkTimer = setTimeout(() => {
+    intervalWalkTimer = null;
+    const walk = intervalWalk;
+    if (!walk) return;
+
+    if (walk.step < walk.question.ladder.length - 1) {
+      walk.step += 1;
+      playPianoNote(walk.question.ladder[walk.step].key, 0.9);
+      renderIntervalNotation();
+      scheduleIntervalWalkStep();
+      return;
+    }
+
+    playIntervalTogether(walk.question);
+    intervalWalkTimer = setTimeout(finishIntervalWalk, INTERVAL_WALK_HOLD_MS);
+  }, INTERVAL_WALK_STEP_MS);
+}
+
+// The end of the reveal, whether it was watched through or cut short. This is
+// where the round actually moves on, so the progress line and the staff agree
+// all the way through the climb.
+function finishIntervalWalk() {
+  clearIntervalWalk();
+  currentIndex += 1;
+  updateStatus();
+  if (currentIndex >= totalNotes) {
+    endGame();
+  } else {
+    renderIntervalsRound();
+  }
+}
+
+function renderIntervalsRound() {
+  ensureIntervalQuestion(currentIndex);
+  renderIntervalNotation();
+}
+
+// Mirrors handleGuess and handleKeyGuess: a wrong answer is counted and costs
+// the streak, but the question stays until it is answered.
+function handleIntervalGuess(size) {
+  if (!gameActive || gameMode !== "intervals") return;
+
+  // A press while the climb is running cuts it short and moves on, the same
+  // bargain the card deck makes with its timer: whoever has already read it
+  // is never held up, and whoever has not can simply watch.
+  if (intervalWalk) {
+    finishIntervalWalk();
+    return;
+  }
+
+  const question = intervalQuestions[currentIndex];
+  if (!question) return;
+
+  if (size === question.size) {
+    correct += 1;
+    streak += 1;
+    triggerFeedback("correct", intervalsNotationEl);
+    updateStatus();
+    // The round moves on at the end of the climb, not here.
+    startIntervalWalk(question);
+  } else {
+    playErrorTone();
+    wrong += 1;
+    streak = 0;
+    triggerFeedback("wrong", intervalsNotationEl);
+    updateStatus();
+    const missed = intervalOptionsEl.querySelector(
+      `[data-interval="${size}"]`,
+    );
+    if (missed) {
+      missed.classList.remove("wrong");
+      void missed.offsetWidth;
+      missed.classList.add("wrong");
+    }
+  }
+}
+
+function startIntervalsGame() {
+  clearIntervalWalk();
+  intervalQuestions = [];
+  currentIndex = 0;
+  correct = 0;
+  wrong = 0;
+  streak = 0;
+  renderIntervalsRound();
+  updateStatus();
+}
+
+intervalOptionsEl.addEventListener("click", (event) => {
+  const btn = event.target.closest("[data-interval]");
+  if (!btn) return;
+  handleIntervalGuess(Number(btn.dataset.interval));
+});
+
+intervalOptionsEl.addEventListener("animationend", (event) => {
+  event.target.classList.remove("wrong");
+});
+
 // --- Reference charts ---
 // Two lookup pages rather than games: every note of the current clef on one
 // staff, and every key signature drawn in that clef. Both follow the clef
@@ -2506,8 +2910,10 @@ window.addEventListener("keydown", (event) => {
 });
 
 function showScreen(screen) {
-  // Leaving the cards screen cancels an advance that has not fired yet.
+  // Leaving the cards screen cancels an advance that has not fired yet, and
+  // leaving a half-climbed interval cancels the rest of it.
   clearCardAdvance();
+  clearIntervalWalk();
   // One way out, in the same place on every screen. The menu is the one screen
   // there is nothing behind, so it is the one screen without it.
   toolbarBack.hidden = screen === menuScreen;
@@ -2519,6 +2925,7 @@ function showScreen(screen) {
     keyChartScreen,
     gameScreen,
     keysScreen,
+    intervalsScreen,
     resultsScreen,
   ]) {
     s.hidden = s !== screen;
@@ -2536,11 +2943,17 @@ function showMenu() {
 // here. The title names that game, and it names it through data-i18n rather
 // than by being written directly, so a language change re-translates the right
 // string.
+const SETUP_TITLE_KEYS = {
+  notes: "setup.title",
+  keys: "setup.titleKeys",
+  intervals: "setup.titleIntervals",
+};
+
 function showSetup(mode = gameMode) {
   gameActive = false;
   gameMode = mode;
   setupTitleEl.dataset.i18n =
-    mode === "keys" ? "setup.titleKeys" : "setup.title";
+    SETUP_TITLE_KEYS[mode] ?? SETUP_TITLE_KEYS.notes;
   setupTitleEl.textContent = t(setupTitleEl.dataset.i18n);
   buildNoteCountOptions();
   showScreen(setupScreen);
@@ -2576,6 +2989,9 @@ function beginGame(questionCount) {
   if (gameMode === "keys") {
     showScreen(keysScreen);
     startKeysGame();
+  } else if (gameMode === "intervals") {
+    showScreen(intervalsScreen);
+    startIntervalsGame();
   } else {
     showScreen(gameScreen);
     startGame();
@@ -2608,6 +3024,8 @@ function beginMelody(melodyId) {
 function restartRound() {
   if (gameMode === "keys") {
     startKeysGame();
+  } else if (gameMode === "intervals") {
+    startIntervalsGame();
   } else if (melodyRound) {
     // A clef too narrow for the tune leaves it unplaceable; the round carries
     // on as a run of that many random notes rather than stopping dead.
@@ -2625,6 +3043,8 @@ function restartRound() {
 function redrawCurrentGame() {
   if (gameMode === "keys") {
     renderKeysRound();
+  } else if (gameMode === "intervals") {
+    renderIntervalNotation();
   } else {
     renderNotation();
   }
@@ -2713,6 +3133,15 @@ window.addEventListener("keydown", (event) => {
     if (btn) handleKeyGuess(btn.dataset.key);
     return;
   }
+  // The interval game is answered by the interval's own number — 5 for a
+  // kvintti — which is why its pad never reshuffles: the key and the button
+  // say the same thing, and both say it in the same place every time.
+  if (gameMode === "intervals") {
+    const choice = Number(event.key);
+    if (!Number.isInteger(choice) || !INTERVAL_SIZES.includes(choice)) return;
+    handleIntervalGuess(choice);
+    return;
+  }
   const key = event.key.toLowerCase();
   if (!/^[a-z]$/.test(key)) return;
   handleGuess(key);
@@ -2758,6 +3187,9 @@ document
 document
   .getElementById("menu-keys")
   .addEventListener("click", () => showSetup("keys"));
+document
+  .getElementById("menu-intervals")
+  .addEventListener("click", () => showSetup("intervals"));
 document
   .getElementById("menu-cards")
   .addEventListener("click", () => showCards("notes"));
@@ -2829,6 +3261,7 @@ function applyLanguage(langId) {
   buildThemeMenu();
   buildClefMenu();
   buildNoteCountOptions();
+  buildIntervalOptions();
   buildRangeEditor();
   redrawCards();
   redrawCharts();
@@ -3067,6 +3500,7 @@ document.addEventListener("keydown", (e) => {
 });
 
 buildNoteCountOptions();
+buildIntervalOptions();
 buildRangeEditor();
 buildNotePad();
 markCardOrder();
