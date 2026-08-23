@@ -677,8 +677,7 @@ const keysScoreEl = document.getElementById("keys-score");
 const keysMistakesEl = document.getElementById("keys-mistakes");
 const keysStreakEl = document.getElementById("keys-streak");
 const noteChartScreen = document.getElementById("note-chart-screen");
-const noteChartStaffEl = document.getElementById("note-chart-staff");
-const noteChartLettersEl = document.getElementById("note-chart-letters");
+const noteChartRowsEl = document.getElementById("note-chart-rows");
 const noteChartClefEl = document.getElementById("note-chart-clef");
 const keyChartScreen = document.getElementById("key-chart-screen");
 const keyChartEl = document.getElementById("key-chart");
@@ -1157,8 +1156,13 @@ function staffGeometry(clef, steps) {
 // are all placed from.
 //
 // Shared by the range editor, where the colour says which notes are in range,
-// and the note chart, where every note is lit the same.
-function drawPoolStaff(staffEl, pool, colorFor) {
+// and the note chart, where every note is drawn in plain ink.
+//
+// columns is how many note-slots the width is divided into, which is the pool's
+// own length everywhere but the last row of a multi-row chart: a row holding
+// fewer notes than the ones above it should keep their spacing and stop early,
+// not spread three notes across the whole staff.
+function drawPoolStaff(staffEl, pool, colorFor, columns = pool.length) {
   const width = staffEl.clientWidth;
   staffEl.replaceChildren();
 
@@ -1209,7 +1213,7 @@ function drawPoolStaff(staffEl, pool, colorFor) {
   // of the clef and of the stave's right edge.
   const first = 10;
   const last = Math.max(first, staveX + staveWidth - 24 - baseX);
-  const gap = pool.length > 1 ? (last - first) / (pool.length - 1) : 0;
+  const gap = columns > 1 ? (last - first) / (columns - 1) : 0;
 
   staveNotes.forEach((sn, i) => {
     sn.getTickContext().setX(first + i * gap);
@@ -1299,11 +1303,12 @@ function renderRangeStaff(staffEl) {
 }
 
 // A pool's note names spelled out under its staff, each centred on its own
-// notehead, the lit ones in the accent colour the noteheads wear. In the range
+// notehead, the lit ones in the colour their noteheads wear. In the range
 // editor "lit" means in range — reading a range off noteheads alone asks the
 // player to name the notes first, which is the very skill they came here to
 // practise; on the note chart every letter is lit, since the whole point is
-// the naming. No octave numbers either place: the staff says which octave.
+// the naming, and there they are ink rather than accent, like the notes above
+// them. No octave numbers either place: the staff says which octave.
 //
 // Aria-hidden. In the editor the .range-hit buttons above already carry every
 // note's name, and on the chart the staff is decoration around a list a screen
@@ -1724,8 +1729,10 @@ function renderKeySignature() {
   tintKeySignature(keysNotationEl, styles.getPropertyValue("--note-current").trim());
 }
 
-// The accidentals are what the player is being asked to read, so they wear the
-// current-note colour the way the note being named does in the other game.
+// Tints a drawn key signature. In the game the accidentals are what the player
+// is being asked to read, so they wear the current-note colour the way the note
+// being named does in the other game; on the chart, which asks nothing, they
+// are ink.
 // VexFlow gives the signature its own group in the SVG, which is the handle.
 function tintKeySignature(container, color) {
   container
@@ -1824,26 +1831,63 @@ keyOptionsEl.addEventListener("animationend", (event) => {
 // picked in the settings, and both say which clef they are showing, since a
 // chart read in the wrong clef is worse than no chart.
 
+// How much width a note wants on the chart. Eighteen notes across a phone
+// leave a column each about as wide as a notehead, so the heads run into one
+// another and the letters underneath collide — measured off the drawn staff:
+// a notehead is ~17px, and this is that with air either side.
+const CHART_MIN_NOTE_SPACING = 30;
+// What the clef glyph takes off the front of every row before the notes start.
+const CHART_CLEF_ROOM = 46;
+
+// How many staves the pool is spread over: as few as will give every note its
+// spacing. One row wherever there is room for one — this only splits when the
+// screen is too narrow to read a single row, which in practice means a phone.
+function noteChartRowCount(width, count) {
+  const perRow = Math.floor((width - CHART_CLEF_ROOM) / CHART_MIN_NOTE_SPACING);
+  if (perRow >= count) return 1;
+  return Math.ceil(count / Math.max(2, perRow));
+}
+
 function renderNoteChart() {
   noteChartClefEl.textContent = t(`clef.${currentClef.id}`);
+  noteChartRowsEl.replaceChildren();
 
   const pool = currentClef.notePool;
-  if (pool.length === 0) {
-    noteChartStaffEl.replaceChildren();
-    noteChartLettersEl.replaceChildren();
-    return;
-  }
+  if (pool.length === 0) return;
 
   // A hidden screen gives the staff no width to lay out in, the same trap the
   // range editor has — showNoteChart draws it once it is on screen.
-  if (noteChartStaffEl.clientWidth === 0) return;
+  const width = noteChartRowsEl.clientWidth;
+  if (width === 0) return;
 
-  const litColor = getComputedStyle(document.documentElement)
-    .getPropertyValue("--note-current")
+  // Ink, not accent: the accent colour means "this is the note being asked
+  // about", and on a lookup page there is no such note. Nothing is picked out
+  // here, so every notehead and every letter is drawn the same.
+  const inkColor = getComputedStyle(document.documentElement)
+    .getPropertyValue("--text")
     .trim();
-  const { xs } = drawPoolStaff(noteChartStaffEl, pool, () => litColor);
-  // Nothing is picked out here: this is a table, so every note is lit.
-  renderNoteLetters(noteChartLettersEl, pool, xs, () => true);
+
+  // Rows of equal length, so the spacing is the same down the whole chart and
+  // a short last row simply stops early rather than spreading itself out.
+  const rows = noteChartRowCount(width, pool.length);
+  const perRow = Math.ceil(pool.length / rows);
+
+  for (let start = 0; start < pool.length; start += perRow) {
+    const notes = pool.slice(start, start + perRow);
+
+    const row = document.createElement("div");
+    row.className = "chart-staff-row";
+    const staffEl = document.createElement("div");
+    staffEl.className = "range-staff";
+    const lettersEl = document.createElement("div");
+    lettersEl.className = "range-letters chart-letters";
+    row.append(staffEl, lettersEl);
+    // In the document before it is drawn: drawPoolStaff measures the staff.
+    noteChartRowsEl.appendChild(row);
+
+    const { xs } = drawPoolStaff(staffEl, notes, () => inkColor, perRow);
+    renderNoteLetters(lettersEl, notes, xs, () => true);
+  }
 }
 
 // One tile: the clef and a signature, with the key's name under it. Sized like
@@ -1875,7 +1919,9 @@ function buildKeyChartTile(key, staveWidth) {
   stave.addKeySignature(key.vf);
   stave.setContext(context).draw();
 
-  tintKeySignature(staff, styles.getPropertyValue("--note-current").trim());
+  // Ink rather than the accent colour: on a lookup page the accidentals are
+  // not a question being asked, they are the entry being looked up.
+  tintKeySignature(staff, styles.getPropertyValue("--text").trim());
   scaleCardSvg(staff, width, height);
 
   const name = document.createElement("span");
