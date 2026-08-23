@@ -8,8 +8,13 @@ const { Renderer, Stave, StaveNote, Voice, Formatter, TickContext } = Vex.Flow;
 const SEMITONE_FROM_C = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 };
 
 function noteFrequency(noteKey) {
-  const [letter, octaveStr] = noteKey.split("/");
-  const midi = (parseInt(octaveStr, 10) + 1) * 12 + SEMITONE_FROM_C[letter];
+  const [name, octaveStr] = noteKey.split("/");
+  // The note pools are all naturals, but a key's tonic can be sharp or flat
+  // ("f#/4", "bb/4"), so any accidentals after the letter shift the semitone.
+  const letter = name[0];
+  let semitone = SEMITONE_FROM_C[letter];
+  for (const mark of name.slice(1)) semitone += mark === "#" ? 1 : -1;
+  const midi = (parseInt(octaveStr, 10) + 1) * 12 + semitone;
   return 440 * 2 ** ((midi - 69) / 12);
 }
 
@@ -20,12 +25,14 @@ function getAudioContext() {
   return audioCtx;
 }
 
-function playPianoNote(noteKey, duration = 1.2) {
+// `delay` schedules the note that many seconds ahead on the audio clock rather
+// than on a timer, so a melody's notes keep time with each other.
+function playPianoNote(noteKey, duration = 1.2, delay = 0) {
   const freq = noteFrequency(noteKey);
   if (!Number.isFinite(freq)) return;
 
   const ctx = getAudioContext();
-  const now = ctx.currentTime;
+  const now = ctx.currentTime + delay;
 
   const harmonics = [
     { ratio: 1, gain: 0.4 },
@@ -74,6 +81,33 @@ function playErrorTone(duration = 0.35) {
   }
 }
 
+// --- Ode to Joy ---
+// The "Freude" theme from the finale of Beethoven's Ninth (1824), long out of
+// copyright. Written as offsets in diatonic steps from the note the tune opens
+// on, plus each note's length in beats: the offsets place it in whatever clef
+// is showing, and the beats are only used when the finished tune is played
+// back — the staff draws it as plain quarter notes like every other round.
+//
+// The tune can only be moved by whole octaves. Every note here is a natural
+// and no clef's pool has accidentals, so shifting it by anything else would
+// change the tune rather than transpose it.
+const ODE_TO_JOY = [
+  [0, 1], [0, 1], [1, 1], [2, 1],
+  [2, 1], [1, 1], [0, 1], [-1, 1],
+  [-2, 1], [-2, 1], [-1, 1], [0, 1],
+  [0, 1.5], [-1, 0.5], [-1, 2],
+  [0, 1], [0, 1], [1, 1], [2, 1],
+  [2, 1], [1, 1], [0, 1], [-1, 1],
+  [-2, 1], [-2, 1], [-1, 1], [0, 1],
+  [-1, 1.5], [-2, 0.5], [-2, 2],
+];
+
+const MELODY_ID = "ode-to-joy";
+// Seconds to a beat, and the pause before the played-back tune starts — long
+// enough that the note the last answer sounded has died away first.
+const MELODY_BEAT_SECONDS = 0.45;
+const MELODY_LEAD_IN_SECONDS = 0.7;
+
 // --- Clefs ---
 // Each note key maps to a rung on the diatonic ladder (7 letters per octave).
 // diatonicStep turns "c/4" into an absolute rung number, so we can ask "is this
@@ -105,14 +139,51 @@ const STRINGS = {
   fi: {
     "app.title": "Nuottien tunnistaminen",
     "settings.title": "Asetukset",
-    "settings.reset": "Palauta oletukset",
     "settings.done": "Valmis",
     "settings.language": "Kieli",
     "settings.clef": "Nuottiavain",
     "settings.theme": "Teema",
     "settings.ranges": "Nuottialue",
     "settings.noNotes": "T\u00e4ll\u00e4 avaimella ei ole viel\u00e4 nuotteja.",
+    "menu.groupNotes": "Nuotit",
+    "menu.groupKeys": "S\u00e4vellajit",
+    "menu.notes": "Tunnista nuotit",
+    "menu.notesNote": "Nime\u00e4 nuotit yksi kerrallaan.",
+    "menu.cards": "Nuottikortit",
+    "menu.cardsNote": "Selaa nuotteja kortteina ja k\u00e4\u00e4nn\u00e4 nimi esiin.",
+    "menu.noteChart": "Nuottitaulukko",
+    "menu.noteChartNote": "Kaikki nuotit yhdell\u00e4 silm\u00e4yksell\u00e4.",
+    "menu.keyChart": "S\u00e4vellajitaulukko",
+    "menu.keyChartNote": "Kaikki s\u00e4vellajit yhdell\u00e4 silm\u00e4yksell\u00e4.",
+    "chart.sharps": "Ylennysmerkit",
+    "chart.flats": "Alennusmerkit",
+    "menu.keyCards": "S\u00e4vellajikortit",
+    "menu.keyCardsNote": "Selaa s\u00e4vellajeja kortteina ja k\u00e4\u00e4nn\u00e4 nimi esiin.",
+    "menu.keys": "Tunnista s\u00e4vellaji",
+    "menu.keysNote": "P\u00e4\u00e4ttele s\u00e4vellaji etumerkinn\u00e4st\u00e4.",
+    "nav.back": "Takaisin",
     "setup.title": "Valitse nuottien m\u00e4\u00e4r\u00e4.",
+    "setup.titleKeys": "Valitse s\u00e4vellajien m\u00e4\u00e4r\u00e4.",
+    "setup.played": "{label} \u2014 pelattu l\u00e4pi",
+    "setup.melody": "Oodi ilolle",
+    "setup.melodyComposer": "Beethoven \u2014 soita koko s\u00e4velm\u00e4",
+    "keys.prompt": "Mik\u00e4 s\u00e4vellaji?",
+    "keys.progress": "S\u00e4vellaji {index} / {total}",
+    "key.cf": "Ces",
+    "key.gf": "Ges",
+    "key.df": "Des",
+    "key.af": "As",
+    "key.ef": "Es",
+    "key.bf": "B",
+    "key.f": "F",
+    "key.c": "C",
+    "key.g": "G",
+    "key.d": "D",
+    "key.a": "A",
+    "key.e": "E",
+    "key.b": "H",
+    "key.fs": "Fis",
+    "key.cs": "Cis",
     "game.correct": "Oikein",
     "game.wrong": "V\u00e4\u00e4rin",
     "game.streak": "Putki",
@@ -124,6 +195,11 @@ const STRINGS = {
     "results.hintBefore": "Paina",
     "results.hintAfter": "pelataksesi uudelleen samalla nuottim\u00e4\u00e4r\u00e4ll\u00e4.",
     "results.accuracy": "Tarkkuus",
+    "cards.title": "Nuottikortit",
+    "cards.hint": "Paina v\u00e4lily\u00f6nti\u00e4 tai napauta korttia. Kortti vaihtuu itsest\u00e4\u00e4n.",
+    "cards.titleKeys": "S\u00e4vellajikortit",
+    "cards.position": "Kortti {index} / {total}",
+    "cards.empty": "T\u00e4ll\u00e4 avaimella ei ole viel\u00e4 nuotteja.",
     "clef.treble": "G-avain",
     "clef.alto": "C-avain",
     "clef.bass": "F-avain",
@@ -138,14 +214,51 @@ const STRINGS = {
   sv: {
     "app.title": "Notl\u00e4sning",
     "settings.title": "Inst\u00e4llningar",
-    "settings.reset": "Standardinst\u00e4llningar",
     "settings.done": "Klar",
     "settings.language": "Spr\u00e5k",
     "settings.clef": "Klav",
     "settings.theme": "Tema",
     "settings.ranges": "Notomr\u00e5de",
     "settings.noNotes": "Den h\u00e4r klaven har inga noter \u00e4nnu.",
+    "menu.groupNotes": "Noter",
+    "menu.groupKeys": "Tonarter",
+    "menu.notes": "K\u00e4nn igen noter",
+    "menu.notesNote": "Namnge noterna en i taget.",
+    "menu.cards": "Notkort",
+    "menu.cardsNote": "Bl\u00e4ddra bland noterna som kort och v\u00e4nd fram namnet.",
+    "menu.noteChart": "Nottabell",
+    "menu.noteChartNote": "Alla noter p\u00e5 en g\u00e5ng.",
+    "menu.keyChart": "Tonartstabell",
+    "menu.keyChartNote": "Alla tonarter p\u00e5 en g\u00e5ng.",
+    "chart.sharps": "H\u00f6jningstecken",
+    "chart.flats": "S\u00e4nkningstecken",
+    "menu.keyCards": "Tonartskort",
+    "menu.keyCardsNote": "Bl\u00e4ddra bland tonarterna som kort och v\u00e4nd fram namnet.",
+    "menu.keys": "K\u00e4nn igen tonarten",
+    "menu.keysNote": "Lista ut tonarten utifr\u00e5n f\u00f6rtecknen.",
+    "nav.back": "Tillbaka",
     "setup.title": "V\u00e4lj antal noter.",
+    "setup.titleKeys": "V\u00e4lj antal tonarter.",
+    "setup.played": "{label} \u2014 genomspelad",
+    "setup.melody": "Hymn till gl\u00e4djen",
+    "setup.melodyComposer": "Beethoven \u2014 spela hela melodin",
+    "keys.prompt": "Vilken tonart?",
+    "keys.progress": "Tonart {index} / {total}",
+    "key.cf": "Cess",
+    "key.gf": "Gess",
+    "key.df": "Dess",
+    "key.af": "Ass",
+    "key.ef": "Ess",
+    "key.bf": "B",
+    "key.f": "F",
+    "key.c": "C",
+    "key.g": "G",
+    "key.d": "D",
+    "key.a": "A",
+    "key.e": "E",
+    "key.b": "H",
+    "key.fs": "Fiss",
+    "key.cs": "Ciss",
     "game.correct": "R\u00e4tt",
     "game.wrong": "Fel",
     "game.streak": "I rad",
@@ -157,6 +270,11 @@ const STRINGS = {
     "results.hintBefore": "Tryck p\u00e5",
     "results.hintAfter": "f\u00f6r att spela igen med samma antal noter.",
     "results.accuracy": "Tr\u00e4ffs\u00e4kerhet",
+    "cards.title": "Notkort",
+    "cards.hint": "Tryck p\u00e5 mellanslag eller p\u00e5 kortet. Kortet byts av sig sj\u00e4lvt.",
+    "cards.titleKeys": "Tonartskort",
+    "cards.position": "Kort {index} / {total}",
+    "cards.empty": "Den h\u00e4r klaven har inga noter \u00e4nnu.",
     "clef.treble": "G-klav",
     "clef.alto": "C-klav",
     "clef.bass": "F-klav",
@@ -393,17 +511,38 @@ const scoreEl = document.getElementById("score");
 const mistakesEl = document.getElementById("mistakes");
 const streakEl = document.getElementById("streak");
 const progressEl = document.getElementById("progress");
+const menuScreen = document.getElementById("menu-screen");
 const setupScreen = document.getElementById("setup-screen");
+const setupTitleEl = document.getElementById("setup-title");
+const setupMelodyEl = document.getElementById("setup-melody");
 const gameScreen = document.getElementById("game-screen");
 const resultsScreen = document.getElementById("results-screen");
 const noteCountOptionsEl = document.getElementById("note-count-options");
 const resultsStatsEl = document.getElementById("results-stats");
 const resultsFaceEl = document.getElementById("results-face");
+const toolbarBack = document.getElementById("toolbar-back");
 const appSettingsToggle = document.getElementById("app-settings-toggle");
 const appSettingsMenu = document.getElementById("app-settings-menu");
 const appSettingsBackdrop = document.getElementById("app-settings-backdrop");
 const rangeRowsEl = document.getElementById("range-rows");
-const settingsResetBtn = document.getElementById("settings-reset");
+const keysScreen = document.getElementById("keys-screen");
+const keysNotationEl = document.getElementById("keys-notation");
+const keyOptionsEl = document.getElementById("key-options");
+const keysProgressEl = document.getElementById("keys-progress");
+const keysScoreEl = document.getElementById("keys-score");
+const keysMistakesEl = document.getElementById("keys-mistakes");
+const keysStreakEl = document.getElementById("keys-streak");
+const noteChartScreen = document.getElementById("note-chart-screen");
+const noteChartStaffEl = document.getElementById("note-chart-staff");
+const noteChartLettersEl = document.getElementById("note-chart-letters");
+const noteChartClefEl = document.getElementById("note-chart-clef");
+const keyChartScreen = document.getElementById("key-chart-screen");
+const keyChartEl = document.getElementById("key-chart");
+const keyChartClefEl = document.getElementById("key-chart-clef");
+const cardsScreen = document.getElementById("cards-screen");
+const noteCardsEl = document.getElementById("note-cards");
+const cardsTitleEl = document.getElementById("cards-title");
+const cardsPositionEl = document.getElementById("cards-position");
 const playAgainBtn = document.getElementById("play-again");
 const notePadEl = document.getElementById("note-pad");
 
@@ -418,6 +557,10 @@ let wrong = 0;
 let streak = 0;
 let totalNotes = 0;
 let gameActive = false;
+// Which game the round in progress belongs to. The two share the counters, the
+// results screen and the setup screen, so almost everything that touches a
+// running game has to know which one is running.
+let gameMode = "notes";
 
 function randomNote() {
   const pool = activeNotePool();
@@ -429,6 +572,62 @@ function ensureBuffer(upTo) {
   if (currentClef.notePool.length === 0) return;
   while (allNotes.length <= upTo) {
     allNotes.push(randomNote());
+  }
+}
+
+// The pool note sitting on a given rung of the diatonic ladder, or undefined
+// if the clef does not reach that far.
+function noteAtStep(clef, step) {
+  return clef.notePool.find((note) => diatonicStep(note.key) === step);
+}
+
+// The tune placed in the clef being shown: the octave that puts it nearest the
+// middle staff line, of those that fit inside the clef's pool. Returns the
+// notes paired with their lengths, or an empty list if no octave fits.
+function melodyNotes(clef) {
+  const pool = clef.notePool;
+  if (pool.length === 0) return [];
+
+  const steps = pool.map((note) => diatonicStep(note.key));
+  const poolLow = Math.min(...steps);
+  const poolHigh = Math.max(...steps);
+  const middle = diatonicStep(clef.middleLine);
+  const offsets = ODE_TO_JOY.map(([offset]) => offset);
+  const lowest = Math.min(...offsets);
+  const highest = Math.max(...offsets);
+
+  let base = null;
+  // Whole octaves only, for the reason ODE_TO_JOY gives. The tune opens on the
+  // third of the scale, so the candidates are the Es the clef can reach.
+  for (let octave = 0; octave <= 9; octave++) {
+    const candidate = octave * 7 + LETTER_STEP.e;
+    if (candidate + lowest < poolLow || candidate + highest > poolHigh) continue;
+    if (base === null || Math.abs(candidate - middle) < Math.abs(base - middle)) {
+      base = candidate;
+    }
+  }
+  if (base === null) return [];
+
+  return ODE_TO_JOY.map(([offset, beats]) => ({
+    note: noteAtStep(clef, base + offset),
+    beats,
+  }));
+}
+
+// The reward for finishing: the whole tune, in time, from the beginning. Every
+// note is scheduled on the audio clock in one go rather than chased with
+// timers, so nothing drifts.
+function playMelody(notes) {
+  let beat = 0;
+  for (const { note, beats } of notes) {
+    const seconds = beats * MELODY_BEAT_SECONDS;
+    playPianoNote(
+      note.key,
+      // A shade under its own length, so repeated notes are heard as two.
+      Math.max(0.3, seconds * 0.9),
+      MELODY_LEAD_IN_SECONDS + beat * MELODY_BEAT_SECONDS,
+    );
+    beat += beats;
   }
 }
 
@@ -527,23 +726,45 @@ function renderNotation() {
   }
 }
 
-function triggerFeedback(type) {
-  notationEl.classList.remove("anim-correct", "anim-wrong");
-  void notationEl.offsetWidth;
-  notationEl.classList.add(type === "correct" ? "anim-correct" : "anim-wrong");
+function triggerFeedback(type, target = notationEl) {
+  target.classList.remove("anim-correct", "anim-wrong");
+  void target.offsetWidth;
+  target.classList.add(type === "correct" ? "anim-correct" : "anim-wrong");
 }
 
-notationEl.addEventListener("animationend", () => {
-  notationEl.classList.remove("anim-correct", "anim-wrong");
-});
+for (const area of [notationEl, keysNotationEl]) {
+  area.addEventListener("animationend", () => {
+    area.classList.remove("anim-correct", "anim-wrong");
+  });
+}
+
+// The two games keep a status block each — same three counters, on their own
+// screen — so the one being played is the one written to.
+function statusElements() {
+  return gameMode === "keys"
+    ? {
+        score: keysScoreEl,
+        mistakes: keysMistakesEl,
+        streak: keysStreakEl,
+        progress: keysProgressEl,
+        progressKey: "keys.progress",
+      }
+    : {
+        score: scoreEl,
+        mistakes: mistakesEl,
+        streak: streakEl,
+        progress: progressEl,
+        progressKey: "game.progress",
+      };
+}
 
 function updateStatus() {
-  scoreEl.textContent = String(correct);
-  mistakesEl.textContent = String(wrong);
-  streakEl.textContent = String(streak);
-  const noteNumber = Math.min(currentIndex + 1, totalNotes);
-  progressEl.textContent = t("game.progress", {
-    index: noteNumber,
+  const status = statusElements();
+  status.score.textContent = String(correct);
+  status.mistakes.textContent = String(wrong);
+  status.streak.textContent = String(streak);
+  status.progress.textContent = t(status.progressKey, {
+    index: Math.min(currentIndex + 1, totalNotes),
     total: totalNotes,
   });
 }
@@ -577,8 +798,11 @@ function handleGuess(key) {
   }
 }
 
-function startGame() {
-  allNotes = [];
+// `notes` is empty for a round of random notes, which ensureBuffer then fills
+// in as the player works through it, and preloaded for the melody, which is
+// already as long as the round.
+function startGame(notes = []) {
+  allNotes = notes;
   currentIndex = 0;
   correct = 0;
   wrong = 0;
@@ -587,6 +811,51 @@ function startGame() {
   updateStatus();
 }
 
+// Which round lengths have been played to the end, per game — a round that was
+// abandoned partway does not count, so the marks say what was finished rather
+// than what was attempted. Stored under "playedCounts" as
+// { "<gameMode>": [count, ...] }.
+const PLAYED_STORAGE_KEY = "playedCounts";
+
+function loadPlayed() {
+  let saved = null;
+  try {
+    saved = JSON.parse(localStorage.getItem(PLAYED_STORAGE_KEY));
+  } catch {
+    // Corrupt or hand-edited storage shouldn't take the game down with it.
+    return {};
+  }
+  if (!saved || typeof saved !== "object") return {};
+
+  const played = {};
+  for (const [mode, ids] of Object.entries(saved)) {
+    // A round is identified by its length, or by MELODY_ID for the tune, which
+    // has a length of its own and is not one of the presets.
+    if (Array.isArray(ids)) {
+      played[mode] = ids.filter(
+        (id) => Number.isFinite(id) || typeof id === "string",
+      );
+    }
+  }
+  return played;
+}
+
+let playedCounts = loadPlayed();
+
+function markPlayed(mode, id) {
+  const ids = playedCounts[mode] ?? [];
+  if (ids.includes(id)) return;
+  playedCounts[mode] = [...ids, id];
+  localStorage.setItem(PLAYED_STORAGE_KEY, JSON.stringify(playedCounts));
+}
+
+function hasPlayed(mode, id) {
+  return (playedCounts[mode] ?? []).includes(id);
+}
+
+// Rebuilt whenever the picker is shown, so the round just finished is marked
+// by the time the player is back here — and so are the marks for the other
+// game when the picker is entered from the other menu entry.
 function buildNoteCountOptions() {
   noteCountOptionsEl.replaceChildren();
   for (const n of NOTE_COUNT_PRESETS) {
@@ -594,9 +863,64 @@ function buildNoteCountOptions() {
     btn.type = "button";
     btn.className = "note-count-btn";
     btn.dataset.count = String(n);
-    btn.textContent = String(n);
+    btn.classList.toggle("played", hasPlayed(gameMode, n));
+
+    const label = document.createElement("span");
+    label.className = "note-count-label";
+    label.textContent = String(n);
+    btn.appendChild(label);
+
+    if (hasPlayed(gameMode, n)) {
+      // A tick rather than a colour alone: the marked and unmarked states have
+      // to be tellable apart without relying on seeing the difference.
+      const mark = document.createElement("span");
+      mark.className = "note-count-mark";
+      mark.textContent = "✓";
+      mark.setAttribute("aria-hidden", "true");
+      btn.appendChild(mark);
+      btn.setAttribute("aria-label", t("setup.played", { label: n }));
+    }
+
     noteCountOptionsEl.appendChild(btn);
   }
+
+  buildMelodyOption();
+}
+
+// A round of a fixed length, so it sits with the lengths rather than anywhere
+// else — but a tune rather than a number, so it gets a row of its own. Only
+// the note game has it: a melody is a run of notes to name, which is not a
+// question the key game asks.
+function buildMelodyOption() {
+  setupMelodyEl.replaceChildren();
+  if (gameMode !== "notes" || melodyNotes(currentClef).length === 0) return;
+
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "melody-btn";
+  btn.id = "setup-melody-btn";
+  btn.classList.toggle("played", hasPlayed(gameMode, MELODY_ID));
+
+  const name = document.createElement("span");
+  name.className = "melody-name";
+  name.textContent = t("setup.melody");
+
+  const composer = document.createElement("span");
+  composer.className = "melody-composer";
+  composer.textContent = t("setup.melodyComposer");
+
+  btn.append(name, composer);
+
+  if (hasPlayed(gameMode, MELODY_ID)) {
+    const mark = document.createElement("span");
+    mark.className = "note-count-mark";
+    mark.textContent = "✓";
+    mark.setAttribute("aria-hidden", "true");
+    btn.appendChild(mark);
+    btn.setAttribute("aria-label", t("setup.played", { label: t("setup.melody") }));
+  }
+
+  setupMelodyEl.appendChild(btn);
 }
 
 // The note range is edited on a staff of its own: the clef's whole pool drawn
@@ -617,7 +941,104 @@ function buildRangeEditor() {
   staff.className = "range-staff";
   rangeRowsEl.appendChild(staff);
 
+  // A sibling rather than a child of the staff: the band and the hit areas are
+  // absolutely positioned across the staff's full height, and letters inside
+  // it would be swept under both. It shares the staff's width, so the same
+  // note x-positions line up in it.
+  const letters = document.createElement("div");
+  letters.className = "range-letters";
+  rangeRowsEl.appendChild(letters);
+
   renderRangeStaff(staff);
+}
+
+// How tall a staff has to be to hold a set of notes, and where its top line
+// goes: notes reaching above or below the five lines need room for their
+// ledger lines. Shared by the range editor and the note cards, which draw the
+// same clef at different sizes and must agree on where the staff sits.
+function staffGeometry(clef, steps) {
+  // VexFlow's staff lines sit 10px apart, so one diatonic step is 5px.
+  const STEP_PX = 5;
+  const middle = diatonicStep(clef.middleLine);
+  const aboveTop = Math.max(0, Math.max(...steps) - (middle + 4));
+  const belowBottom = Math.max(0, middle - 4 - Math.min(...steps));
+  // The clef glyph itself overhangs the staff, which sets the minimums.
+  const padTop = Math.max(20, aboveTop * STEP_PX + 18);
+  const padBottom = Math.max(30, belowBottom * STEP_PX + 18);
+  // A Stave draws its top line four line-spaces below the y it is given —
+  // room it reserves for ledger lines — so the y we want is that much higher.
+  const STAVE_TOP_RESERVE = 40;
+  const staveY = Math.max(0, padTop - STAVE_TOP_RESERVE);
+  return { staveY, height: staveY + STAVE_TOP_RESERVE + 40 + padBottom };
+}
+
+// Draws a clef's whole pool across one staff: whole notes at even intervals of
+// our own choosing, sized so ledger lines fit, each in whatever colour the
+// caller asks for. Returns the noteheads' x positions and the spacing between
+// them, which is what the range band, the hit areas and the letters underneath
+// are all placed from.
+//
+// Shared by the range editor, where the colour says which notes are in range,
+// and the note chart, where every note is lit the same.
+function drawPoolStaff(staffEl, pool, colorFor) {
+  const width = staffEl.clientWidth;
+  staffEl.replaceChildren();
+
+  const steps = pool.map((note) => diatonicStep(note.key));
+  const { staveY, height } = staffGeometry(currentClef, steps);
+
+  const renderer = new Renderer(staffEl, Renderer.Backends.SVG);
+  renderer.resize(width, height);
+  const context = renderer.getContext();
+
+  const styles = getComputedStyle(document.documentElement);
+  const staffColor = styles.getPropertyValue("--staff-color").trim();
+  const ledgerColor = styles.getPropertyValue("--text").trim();
+  context.setFillStyle(staffColor);
+  context.setStrokeStyle(staffColor);
+
+  const staveX = 2;
+  const staveWidth = width - 4;
+  const stave = new Stave(staveX, staveY, staveWidth);
+  stave.addClef(currentClef.id);
+  stave.setDefaultLedgerLineStyle({
+    strokeStyle: ledgerColor,
+    fillStyle: ledgerColor,
+    lineWidth: 2,
+  });
+  stave.setContext(context).draw();
+
+  // Whole notes: no stems to clutter a staff that is a control or a table,
+  // not music.
+  const staveNotes = pool.map((note, i) => {
+    const sn = new StaveNote({
+      keys: [note.key],
+      duration: "w",
+      clef: currentClef.id,
+    });
+    const color = colorFor(i);
+    sn.setStyle({ fillStyle: color, strokeStyle: color });
+    sn.setContext(context).setStave(stave);
+    // Each note gets a tick context of its own so its x is ours to set; the
+    // x we hand it is measured from where the stave's notes begin.
+    new TickContext().addTickable(sn).preFormat().setX(0);
+    return sn;
+  });
+
+  // Where a note placed at x = 0 actually lands, i.e. just past the clef.
+  const baseX = staveNotes[0].getAbsoluteX();
+  // Insets keep the first and last noteheads — and their ledger lines — clear
+  // of the clef and of the stave's right edge.
+  const first = 10;
+  const last = Math.max(first, staveX + staveWidth - 24 - baseX);
+  const gap = pool.length > 1 ? (last - first) / (pool.length - 1) : 0;
+
+  staveNotes.forEach((sn, i) => {
+    sn.getTickContext().setX(first + i * gap);
+    sn.draw();
+  });
+
+  return { xs: staveNotes.map((sn) => sn.getAbsoluteX()), gap, width };
 }
 
 // Draws every note of the pool on a staff of its own, in-range notes in the
@@ -643,84 +1064,20 @@ function renderRangeStaff(staffEl) {
   const width = staffEl.clientWidth;
   if (width === 0) return;
 
-  staffEl.replaceChildren();
-
-  // VexFlow's staff lines sit 10px apart, so one diatonic step is 5px.
-  const STEP_PX = 5;
-  const steps = pool.map((note) => diatonicStep(note.key));
-  const middle = diatonicStep(currentClef.middleLine);
-  const aboveTop = Math.max(0, Math.max(...steps) - (middle + 4));
-  const belowBottom = Math.max(0, middle - 4 - Math.min(...steps));
-  // The clef glyph itself overhangs the staff, which sets the minimums.
-  const padTop = Math.max(20, aboveTop * STEP_PX + 18);
-  const padBottom = Math.max(30, belowBottom * STEP_PX + 18);
-  // A Stave draws its top line four line-spaces below the y it is given —
-  // room it reserves for ledger lines — so the y we want is that much higher.
-  const STAVE_TOP_RESERVE = 40;
-  const staveY = Math.max(0, padTop - STAVE_TOP_RESERVE);
-  const height = staveY + STAVE_TOP_RESERVE + 40 + padBottom;
-
-  const renderer = new Renderer(staffEl, Renderer.Backends.SVG);
-  renderer.resize(width, height);
-  const context = renderer.getContext();
-
-  const styles = getComputedStyle(document.documentElement);
-  const staffColor = styles.getPropertyValue("--staff-color").trim();
-  const ledgerColor = styles.getPropertyValue("--text").trim();
-  const inColor = styles.getPropertyValue("--note-current").trim();
-  const outColor = styles.getPropertyValue("--note-future").trim();
-  context.setFillStyle(staffColor);
-  context.setStrokeStyle(staffColor);
-
-  const staveX = 2;
-  const staveWidth = width - 4;
-  const stave = new Stave(staveX, staveY, staveWidth);
-  stave.addClef(currentClef.id);
-  stave.setDefaultLedgerLineStyle({
-    strokeStyle: ledgerColor,
-    fillStyle: ledgerColor,
-    lineWidth: 2,
-  });
-  stave.setContext(context).draw();
-
   const low = diatonicStep(range.low);
   const high = diatonicStep(range.high);
+  const steps = pool.map((note) => diatonicStep(note.key));
 
-  // Whole notes: no stems to clutter a staff that is a control, not music.
-  const staveNotes = pool.map((note, i) => {
-    const inRange = steps[i] >= low && steps[i] <= high;
-    const sn = new StaveNote({
-      keys: [note.key],
-      duration: "w",
-      clef: currentClef.id,
-    });
-    const color = inRange ? inColor : outColor;
-    sn.setStyle({ fillStyle: color, strokeStyle: color });
-    sn.setContext(context).setStave(stave);
-    // Each note gets a tick context of its own so its x is ours to set; the
-    // x we hand it is measured from where the stave's notes begin.
-    new TickContext().addTickable(sn).preFormat().setX(0);
-    return sn;
-  });
+  const styles = getComputedStyle(document.documentElement);
+  const inColor = styles.getPropertyValue("--note-current").trim();
+  const outColor = styles.getPropertyValue("--note-future").trim();
 
-  // Where a note placed at x = 0 actually lands, i.e. just past the clef.
-  const baseX = staveNotes[0].getAbsoluteX();
-  // Insets keep the first and last noteheads — and their ledger lines — clear
-  // of the clef and of the stave's right edge.
-  const first = 10;
-  const last = Math.max(first, staveX + staveWidth - 24 - baseX);
-  const gap = pool.length > 1 ? (last - first) / (pool.length - 1) : 0;
+  const { xs, gap } = drawPoolStaff(staffEl, pool, (i) =>
+    steps[i] >= low && steps[i] <= high ? inColor : outColor,
+  );
 
-  staveNotes.forEach((sn, i) => {
-    sn.getTickContext().setX(first + i * gap);
-    sn.draw();
-  });
-
-  const xs = staveNotes.map((sn) => sn.getAbsoluteX());
-
-  // The band spanning the range. Drawn before the hit areas so their hover
-  // highlight still reads on top of it, and positioned before it is in the
-  // document so its first paint doesn't animate in from nowhere.
+  // The band spanning the range. Positioned before it is in the document so
+  // its first paint doesn't animate in from nowhere.
   const band = document.createElement("div");
   band.className = "range-band";
   positionRangeBand(
@@ -730,13 +1087,6 @@ function renderRangeStaff(staffEl) {
     range,
   );
   staffEl.appendChild(band);
-
-  // The preview grip: where the band's own grip would end up if the press
-  // landed where the pointer is. Hidden until something hovers or focuses the
-  // staff — see showRangeGhost.
-  const ghost = document.createElement("div");
-  ghost.className = "range-ghost";
-  staffEl.appendChild(ghost);
 
   // Kept for the drag, which repositions the band without redrawing the staff.
   staffEl.dataset.noteGap = String(gap);
@@ -761,6 +1111,45 @@ function renderRangeStaff(staffEl) {
     hit.setAttribute("aria-label", noteLabel(currentClef, note.key));
     staffEl.appendChild(hit);
   });
+
+  renderNoteLetters(
+    rangeRowsEl.querySelector(".range-letters"),
+    pool,
+    xs,
+    (i) => steps[i] >= low && steps[i] <= high,
+  );
+}
+
+// A pool's note names spelled out under its staff, each centred on its own
+// notehead, the lit ones in the accent colour the noteheads wear. In the range
+// editor "lit" means in range — reading a range off noteheads alone asks the
+// player to name the notes first, which is the very skill they came here to
+// practise; on the note chart every letter is lit, since the whole point is
+// the naming. No octave numbers either place: the staff says which octave.
+//
+// Aria-hidden. In the editor the .range-hit buttons above already carry every
+// note's name, and on the chart the staff is decoration around a list a screen
+// reader is given in text.
+// getAbsoluteX reports a note's left edge, not the middle of its head, so a
+// letter centred on it sits half a notehead to the left of the note it names.
+// Measured rather than guessed: a whole note's head is ~17px across at the
+// size the staff is drawn, which puts its middle here.
+const NOTEHEAD_HALF_WIDTH = 8.5;
+
+function renderNoteLetters(lettersEl, pool, xs, isLit) {
+  if (!lettersEl) return;
+
+  lettersEl.replaceChildren();
+  lettersEl.setAttribute("aria-hidden", "true");
+
+  pool.forEach((note, i) => {
+    const letter = document.createElement("span");
+    letter.className = "range-letter";
+    letter.classList.toggle("lit", isLit(i));
+    letter.style.left = `${xs[i] + NOTEHEAD_HALF_WIDTH}px`;
+    letter.textContent = note.name.toUpperCase();
+    lettersEl.appendChild(letter);
+  });
 }
 
 // Redraws the staff wherever it is called from — a theme change, a resize, or
@@ -782,8 +1171,7 @@ function positionRangeBand(band, columns, gap, range) {
   band.style.width = `${columns[highIdx].x - columns[lowIdx].x + pad * 2}px`;
 }
 
-// How far past the outermost noteheads the band reaches. Shared with the ghost
-// grip, which has to land exactly where the real one would.
+// How far past the outermost noteheads the band reaches.
 function bandPad(gap) {
   return Math.max(8, Math.min(16, gap / 2));
 }
@@ -828,6 +1216,7 @@ function commitRange(range) {
   noteRanges[currentClef.id] = { ...range };
   localStorage.setItem(RANGE_STORAGE_KEY, JSON.stringify(noteRanges));
   redrawRangeStaff();
+  redrawCards();
 }
 
 // The click path, which after the drag handlers below is left serving the
@@ -909,10 +1298,6 @@ rangeRowsEl.addEventListener("pointerdown", (event) => {
   const key = columnKeyAt(columns, offsetXOf(staffEl, event));
   const edge = edgeNearest(range, key);
 
-  // The band itself now shows what the press did, so the preview of it steps
-  // out of the way.
-  hideRangeGhost();
-
   rangeDrag = {
     pointerId: event.pointerId,
     staffEl,
@@ -952,14 +1337,9 @@ window.addEventListener("pointermove", (event) => {
 
 window.addEventListener("pointerup", (event) => {
   if (!rangeDrag || event.pointerId !== rangeDrag.pointerId) return;
-  const { staffEl, range } = rangeDrag;
+  const { range } = rangeDrag;
   endRangeDrag();
   commitRange(range);
-  // A mouse that is still resting on the staff would otherwise show no preview
-  // until it moved again, so put one back under it straight away.
-  if (event.pointerType !== "touch") {
-    showRangeGhost(staffEl, offsetXOf(staffEl, event));
-  }
 });
 
 window.addEventListener("pointercancel", (event) => {
@@ -970,69 +1350,6 @@ window.addEventListener("pointercancel", (event) => {
   endRangeDrag();
   positionRangeBand(band, columns, gap, committed);
 });
-
-// --- Previewing where a press would land ---
-// Highlighting the column under the pointer said almost nothing: a column is a
-// few pixels wide, and the answer the player wants is which end of the range
-// moves and where it comes to rest. So the preview is a dimmer copy of the
-// band's own grip, shown where that grip would be if the press happened here —
-// including the stop at the other end, which a hover over the far side reveals
-// before the press instead of after it.
-function ghostGripX(columns, gap, range, key) {
-  const edge = edgeNearest(range, key);
-  const moved = rangeWithEdgeAt(range, edge, key);
-  const column = columns.find(
-    (col) => col.key === (edge === "low" ? moved.low : moved.high),
-  );
-  if (!column) return null;
-  // Mirrors .range-band's grips, which straddle the band's edges by 1px.
-  const pad = bandPad(gap) + 1;
-  return edge === "low" ? column.x - pad : column.x + pad;
-}
-
-function showRangeGhost(staffEl, offsetX) {
-  const ghost = staffEl.querySelector(".range-ghost");
-  const range = rangeFor(currentClef);
-  if (!ghost || !range) return;
-
-  const columns = staffColumns(staffEl);
-  if (columns.length === 0) return;
-
-  const gap = Number(staffEl.dataset.noteGap) || 0;
-  const x = ghostGripX(columns, gap, range, columnKeyAt(columns, offsetX));
-  if (x === null) return;
-
-  // GRIP_WIDTH / 2: the x above is the grip's centre.
-  ghost.style.left = `${x - 3}px`;
-  ghost.classList.add("visible");
-}
-
-function hideRangeGhost() {
-  rangeRowsEl
-    .querySelectorAll(".range-ghost.visible")
-    .forEach((ghost) => ghost.classList.remove("visible"));
-}
-
-// Touch is left out: it has no hover, and a press there has already moved the
-// band by the time anything could be previewed.
-rangeRowsEl.addEventListener("pointermove", (event) => {
-  if (rangeDrag || event.pointerType === "touch") return;
-  const staffEl = event.target.closest(".range-staff");
-  hideRangeGhost();
-  if (staffEl) showRangeGhost(staffEl, offsetXOf(staffEl, event));
-});
-
-rangeRowsEl.addEventListener("pointerleave", hideRangeGhost);
-
-// The keyboard gets the same preview, moving from note to note as Tab does, so
-// Enter is never a guess about which end will follow.
-rangeRowsEl.addEventListener("focusin", (event) => {
-  const hit = event.target.closest(".range-hit");
-  hideRangeGhost();
-  if (hit) showRangeGhost(hit.closest(".range-staff"), Number(hit.dataset.x));
-});
-
-rangeRowsEl.addEventListener("focusout", hideRangeGhost);
 
 function buildNotePad() {
   if (!notePadEl) return;
@@ -1047,22 +1364,752 @@ function buildNotePad() {
   }
 }
 
+// --- Note cards ---
+// A deck of the notes actually in play — the active clef's pool cropped to the
+// chosen range. One card fills the screen at a time: the front is the note on
+// a staff, the back its name, and a press flips it over. No score and no
+// clock: this is the side of the app you read rather than play.
+
+// Nordic H is the international B. The back carries both, so whichever naming
+// the player was taught is on the card. Nothing else joins them — the card
+// answers "which letter is this", so an octave number would be a second
+// question the game never asks.
+const INTERNATIONAL_NAMES = { h: "B" };
+
+function cardNoteName(note) {
+  const nordic = note.name.toUpperCase();
+  const international = INTERNATIONAL_NAMES[note.name];
+  return international ? `${nordic} / ${international}` : nordic;
+}
+
+// One card's front for the note deck: the clef and a single whole note. Cards
+// are laid out by CSS rather than measured, so this draws correctly even while
+// the screen is still hidden.
+function renderCardStaff(faceEl, note, geometry) {
+  const { staveY, height } = geometry;
+  const WIDTH = 150;
+
+  const renderer = new Renderer(faceEl, Renderer.Backends.SVG);
+  renderer.resize(WIDTH, height);
+  const context = renderer.getContext();
+
+  const styles = getComputedStyle(document.documentElement);
+  const staffColor = styles.getPropertyValue("--staff-color").trim();
+  const ledgerColor = styles.getPropertyValue("--text").trim();
+  const noteColor = styles.getPropertyValue("--note-current").trim();
+  context.setFillStyle(staffColor);
+  context.setStrokeStyle(staffColor);
+
+  const staveX = 2;
+  const staveWidth = WIDTH - 4;
+  const stave = new Stave(staveX, staveY, staveWidth);
+  stave.addClef(currentClef.id);
+  stave.setDefaultLedgerLineStyle({
+    strokeStyle: ledgerColor,
+    fillStyle: ledgerColor,
+    lineWidth: 2,
+  });
+  stave.setContext(context).draw();
+
+  // A whole note, as on the range staff: no stem to place, and nothing that
+  // reads as a rhythm on a card that is only about pitch.
+  const staveNote = new StaveNote({
+    keys: [note.key],
+    duration: "w",
+    clef: currentClef.id,
+  });
+  staveNote.setStyle({ fillStyle: noteColor, strokeStyle: noteColor });
+  staveNote.setContext(context).setStave(stave);
+  new TickContext().addTickable(staveNote).preFormat().setX(0);
+
+  // Centred between the clef and the stave's right edge, using the same insets
+  // the range staff keeps clear at either end.
+  const baseX = staveNote.getAbsoluteX();
+  const first = 10;
+  const last = Math.max(first, staveX + staveWidth - 24 - baseX);
+  staveNote.getTickContext().setX((first + last) / 2);
+  staveNote.draw();
+
+  scaleCardSvg(faceEl, WIDTH, height);
+}
+
+// --- Key signatures ---
+// The major keys around the circle of fifths, seven flats through seven
+// sharps. `vf` is VexFlow's key spec, which is what actually draws the
+// signature (and places it correctly for whichever clef is showing);
+// `accidentals` is the signed count, which the distractor picker measures
+// distance with; `tonic` is what a right answer sounds.
+//
+// The names are translated, unlike the plain note letters: Finnish and Swedish
+// spell the altered degrees differently (Es/Ess, Fis/Fiss), so they live in
+// STRINGS under `key.<id>` rather than in this table.
+const KEYS = [
+  { id: "cf", vf: "Cb", accidentals: -7, tonic: "cb/4" },
+  { id: "gf", vf: "Gb", accidentals: -6, tonic: "gb/4" },
+  { id: "df", vf: "Db", accidentals: -5, tonic: "db/4" },
+  { id: "af", vf: "Ab", accidentals: -4, tonic: "ab/4" },
+  { id: "ef", vf: "Eb", accidentals: -3, tonic: "eb/4" },
+  { id: "bf", vf: "Bb", accidentals: -2, tonic: "bb/4" },
+  { id: "f", vf: "F", accidentals: -1, tonic: "f/4" },
+  { id: "c", vf: "C", accidentals: 0, tonic: "c/4" },
+  { id: "g", vf: "G", accidentals: 1, tonic: "g/4" },
+  { id: "d", vf: "D", accidentals: 2, tonic: "d/4" },
+  { id: "a", vf: "A", accidentals: 3, tonic: "a/4" },
+  { id: "e", vf: "E", accidentals: 4, tonic: "e/4" },
+  { id: "b", vf: "B", accidentals: 5, tonic: "b/4" },
+  { id: "fs", vf: "F#", accidentals: 6, tonic: "f#/4" },
+  { id: "cs", vf: "C#", accidentals: 7, tonic: "c#/4" },
+];
+
+// Staff left past the signature, so it reads as a staff carrying one rather
+// than as a signature cropped out of one.
+const KEY_STAVE_TRAILING = 44;
+
+// How many answers a question offers. Also the highest number key that answers
+// one, so keep it in single digits.
+const KEY_CHOICES = 4;
+
+function shuffled(items) {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+// The wrong answers are drawn from the signatures nearest the right one on the
+// circle of fifths. Picked from the whole circle they would mostly be a
+// giveaway — telling four sharps from six flats needs no reading — where
+// neighbours differ by an accidental or two and have to be counted.
+function keyChoices(answer) {
+  const near = KEYS.filter((key) => key.id !== answer.id)
+    .sort(
+      (a, b) =>
+        Math.abs(a.accidentals - answer.accidentals) -
+        Math.abs(b.accidentals - answer.accidentals),
+    )
+    .slice(0, (KEY_CHOICES - 1) * 2);
+  return shuffled([answer, ...shuffled(near).slice(0, KEY_CHOICES - 1)]);
+}
+
+// One entry per question, built on demand and kept: a question the player is
+// still getting wrong must keep the same four answers underneath them.
+let keyQuestions = [];
+
+function ensureKeyQuestion(index) {
+  while (keyQuestions.length <= index) {
+    const key = KEYS[Math.floor(Math.random() * KEYS.length)];
+    keyQuestions.push({ key, choices: keyChoices(key) });
+  }
+  return keyQuestions[index];
+}
+
+// The signature on a staff of its own. Only the clef and the accidentals are
+// drawn — there is no note to name here, so nothing else belongs on it.
+function renderKeySignature() {
+  const question = keyQuestions[currentIndex];
+  if (!question) return;
+
+  keysNotationEl.replaceChildren();
+
+  const available = keysNotationEl.clientWidth || 700;
+  const height = 120;
+
+  const renderer = new Renderer(keysNotationEl, Renderer.Backends.SVG);
+  const context = renderer.getContext();
+
+  const styles = getComputedStyle(document.documentElement);
+  const staffColor = styles.getPropertyValue("--staff-color").trim();
+  context.setFillStyle(staffColor);
+  context.setStrokeStyle(staffColor);
+
+  // How wide the clef and signature come out, measured off a stave that is
+  // never drawn. A signature runs from nothing at all (C) to seven accidentals,
+  // and a staff sized for the widest would leave C floating in an empty field.
+  const probe = new Stave(0, 0, available);
+  probe.addClef(currentClef.id);
+  probe.addKeySignature(question.key.vf);
+  probe.setContext(context);
+  const staveWidth = Math.min(
+    available - 20,
+    probe.getNoteStartX() + KEY_STAVE_TRAILING,
+  );
+  // Only as wide as it needs to be, and centred by .notation-area's own rule.
+  renderer.resize(staveWidth + 20, height);
+
+  const stave = new Stave(10, 15, staveWidth);
+  stave.addClef(currentClef.id);
+  stave.addKeySignature(question.key.vf);
+  stave.setContext(context).draw();
+
+  tintKeySignature(keysNotationEl, styles.getPropertyValue("--note-current").trim());
+}
+
+// The accidentals are what the player is being asked to read, so they wear the
+// current-note colour the way the note being named does in the other game.
+// VexFlow gives the signature its own group in the SVG, which is the handle.
+function tintKeySignature(container, color) {
+  container
+    .querySelectorAll(".vf-keysignature path, .vf-keysignature rect")
+    .forEach((el) => {
+      el.setAttribute("fill", color);
+      el.setAttribute("stroke", color);
+    });
+}
+
+function renderKeyChoices() {
+  const question = keyQuestions[currentIndex];
+  keyOptionsEl.replaceChildren();
+  if (!question) return;
+
+  for (const key of question.choices) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "key-option";
+    btn.dataset.key = key.id;
+
+    const name = document.createElement("span");
+    name.className = "key-option-name";
+    name.textContent = t(`key.${key.id}`);
+
+    btn.appendChild(name);
+    keyOptionsEl.appendChild(btn);
+  }
+}
+
+function renderKeysRound() {
+  ensureKeyQuestion(currentIndex);
+  renderKeySignature();
+  renderKeyChoices();
+}
+
+// Mirrors handleGuess: a wrong answer costs the streak and is counted, but the
+// question stays until it is answered, so accuracy measures how many tries the
+// round took rather than how much was skipped.
+function handleKeyGuess(keyId) {
+  if (!gameActive || gameMode !== "keys") return;
+
+  const question = keyQuestions[currentIndex];
+  if (!question) return;
+
+  if (keyId === question.key.id) {
+    playPianoNote(question.key.tonic);
+    correct += 1;
+    streak += 1;
+    currentIndex += 1;
+    triggerFeedback("correct", keysNotationEl);
+    updateStatus();
+    if (currentIndex >= totalNotes) {
+      endGame();
+    } else {
+      renderKeysRound();
+    }
+  } else {
+    playErrorTone();
+    wrong += 1;
+    streak = 0;
+    triggerFeedback("wrong", keysNotationEl);
+    updateStatus();
+    const missed = keyOptionsEl.querySelector(`[data-key="${keyId}"]`);
+    if (missed) {
+      missed.classList.remove("wrong");
+      void missed.offsetWidth;
+      missed.classList.add("wrong");
+    }
+  }
+}
+
+function startKeysGame() {
+  keyQuestions = [];
+  currentIndex = 0;
+  correct = 0;
+  wrong = 0;
+  streak = 0;
+  renderKeysRound();
+  updateStatus();
+}
+
+keyOptionsEl.addEventListener("click", (event) => {
+  const btn = event.target.closest("[data-key]");
+  if (!btn) return;
+  handleKeyGuess(btn.dataset.key);
+});
+
+keyOptionsEl.addEventListener("animationend", (event) => {
+  event.target.classList.remove("wrong");
+});
+
+// --- Reference charts ---
+// Two lookup pages rather than games: every note of the current clef on one
+// staff, and every key signature drawn in that clef. Both follow the clef
+// picked in the settings, and both say which clef they are showing, since a
+// chart read in the wrong clef is worse than no chart.
+
+function renderNoteChart() {
+  noteChartClefEl.textContent = t(`clef.${currentClef.id}`);
+
+  const pool = currentClef.notePool;
+  if (pool.length === 0) {
+    noteChartStaffEl.replaceChildren();
+    noteChartLettersEl.replaceChildren();
+    return;
+  }
+
+  // A hidden screen gives the staff no width to lay out in, the same trap the
+  // range editor has — showNoteChart draws it once it is on screen.
+  if (noteChartStaffEl.clientWidth === 0) return;
+
+  const litColor = getComputedStyle(document.documentElement)
+    .getPropertyValue("--note-current")
+    .trim();
+  const { xs } = drawPoolStaff(noteChartStaffEl, pool, () => litColor);
+  // Nothing is picked out here: this is a table, so every note is lit.
+  renderNoteLetters(noteChartLettersEl, pool, xs, () => true);
+}
+
+// One tile: the clef and a signature, with the key's name under it. Sized like
+// the key cards — one canvas for the whole chart, so the tiles are all at the
+// same scale and can be compared down a column.
+function buildKeyChartTile(key, staveWidth) {
+  const tile = document.createElement("div");
+  tile.className = "key-chart-tile";
+
+  const staff = document.createElement("div");
+  staff.className = "key-chart-staff";
+  tile.appendChild(staff);
+
+  const renderer = new Renderer(staff, Renderer.Backends.SVG);
+  const context = renderer.getContext();
+
+  const styles = getComputedStyle(document.documentElement);
+  const staffColor = styles.getPropertyValue("--staff-color").trim();
+  context.setFillStyle(staffColor);
+  context.setStrokeStyle(staffColor);
+
+  const staveY = 14;
+  const height = staveY + 40 + 40 + 26;
+  const width = staveWidth + 20;
+  renderer.resize(width, height);
+
+  const stave = new Stave(10, staveY, staveWidth);
+  stave.addClef(currentClef.id);
+  stave.addKeySignature(key.vf);
+  stave.setContext(context).draw();
+
+  tintKeySignature(staff, styles.getPropertyValue("--note-current").trim());
+  scaleCardSvg(staff, width, height);
+
+  const name = document.createElement("span");
+  name.className = "key-chart-name";
+  name.textContent = t(`key.${key.id}`);
+  tile.appendChild(name);
+
+  return tile;
+}
+
+// The widest signature there is, in the clef being shown. Every tile is drawn
+// on a canvas that size, so C major does not come out at the same width as
+// seven sharps with its accidentals shrunk to match.
+function widestKeySignature() {
+  const probeHost = document.createElement("div");
+  const renderer = new Renderer(probeHost, Renderer.Backends.SVG);
+  const context = renderer.getContext();
+  let widest = 0;
+  for (const key of KEYS) {
+    const probe = new Stave(0, 0, 400);
+    probe.addClef(currentClef.id);
+    probe.addKeySignature(key.vf);
+    probe.setContext(context);
+    widest = Math.max(widest, probe.getNoteStartX());
+  }
+  return widest + KEY_STAVE_TRAILING;
+}
+
+// Grouped the way a signature is actually looked up: the sharp keys in order
+// of how many sharps they carry, then the flat ones. C major sits at the head
+// of the sharps, being nought of them, rather than being listed twice.
+function renderKeyChart() {
+  keyChartClefEl.textContent = t(`clef.${currentClef.id}`);
+  keyChartEl.replaceChildren();
+
+  const staveWidth = widestKeySignature();
+  const groups = [
+    ["chart.sharps", KEYS.filter((key) => key.accidentals >= 0)],
+    ["chart.flats", [...KEYS.filter((key) => key.accidentals < 0)].reverse()],
+  ];
+
+  for (const [labelKey, keys] of groups) {
+    const section = document.createElement("section");
+    section.className = "key-chart-group";
+
+    const heading = document.createElement("h2");
+    heading.className = "key-chart-heading";
+    heading.textContent = t(labelKey);
+    section.appendChild(heading);
+
+    const grid = document.createElement("div");
+    grid.className = "key-chart-grid";
+    for (const key of keys) grid.appendChild(buildKeyChartTile(key, staveWidth));
+    section.appendChild(grid);
+
+    keyChartEl.appendChild(section);
+  }
+}
+
+// Both charts read their colours from CSS at draw time and both follow the
+// clef, so anything that moves either redraws them — but only the one being
+// looked at.
+function redrawCharts() {
+  if (!noteChartScreen.hidden) renderNoteChart();
+  if (!keyChartScreen.hidden) renderKeyChart();
+}
+
+function showNoteChart() {
+  gameActive = false;
+  showScreen(noteChartScreen);
+  // After the screen is up: the staff is measured, and a hidden one has no
+  // width to measure.
+  renderNoteChart();
+}
+
+function showKeyChart() {
+  gameActive = false;
+  renderKeyChart();
+  showScreen(keyChartScreen);
+}
+
+document.getElementById("menu-notechart").addEventListener("click", showNoteChart);
+document.getElementById("menu-keychart").addEventListener("click", showKeyChart);
+
+// Which deck is on the cards screen: the clef's notes, or the key signatures.
+// The two decks work the same way — a staff on the front, a name on the back —
+// so they share the screen, the flip and the stepping, and differ only in what
+// is drawn and what is named.
+let cardMode = "notes";
+
+function cardDeck() {
+  return cardMode === "keys" ? keyCardOrder() : activeNotePool();
+}
+
+// The key deck runs outward from the middle of the circle of fifths: C first,
+// then the one-accidental keys, and so on out to the seven. A deck that opened
+// on seven flats would be teaching the hardest card first; this way each card
+// adds an accidental to the one before it. Sharps come before flats at equal
+// distance, arbitrarily but consistently.
+function keyCardOrder() {
+  return [...KEYS].sort(
+    (a, b) =>
+      Math.abs(a.accidentals) - Math.abs(b.accidentals) ||
+      b.accidentals - a.accidentals,
+  );
+}
+
+// One card's front for the key deck: the clef and a signature. Every card is
+// drawn on the same canvas, sized to the widest signature there is, so a
+// seven-sharp signature and a bare C major staff come out at the same scale
+// instead of each being blown up to fill the card.
+function renderCardKeySignature(faceEl, key) {
+  const renderer = new Renderer(faceEl, Renderer.Backends.SVG);
+  const context = renderer.getContext();
+
+  const styles = getComputedStyle(document.documentElement);
+  const staffColor = styles.getPropertyValue("--staff-color").trim();
+  context.setFillStyle(staffColor);
+  context.setStrokeStyle(staffColor);
+
+  let widest = 0;
+  for (const entry of KEYS) {
+    const probe = new Stave(0, 0, 400);
+    probe.addClef(currentClef.id);
+    probe.addKeySignature(entry.vf);
+    probe.setContext(context);
+    widest = Math.max(widest, probe.getNoteStartX());
+  }
+
+  const staveWidth = widest + KEY_STAVE_TRAILING;
+  const WIDTH = staveWidth + 20;
+  // Room above and below the five lines for the accidentals that sit outside
+  // them, plus what the clef glyph overhangs.
+  const staveY = 14;
+  const height = staveY + 40 + 40 + 26;
+  renderer.resize(WIDTH, height);
+
+  const stave = new Stave(10, staveY, staveWidth);
+  stave.addClef(currentClef.id);
+  stave.addKeySignature(key.vf);
+  stave.setContext(context).draw();
+
+  tintKeySignature(faceEl, styles.getPropertyValue("--note-current").trim());
+  scaleCardSvg(faceEl, WIDTH, height);
+}
+
+// Hands the SVG over to CSS: a viewBox and no size of its own, so the card's
+// width decides how big the staff comes out. VexFlow writes the size it was
+// resized to as attributes *and* as an inline style, and the inline one would
+// otherwise outrank the stylesheet.
+function scaleCardSvg(faceEl, width, height) {
+  const svg = faceEl.querySelector("svg");
+  if (!svg) return;
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.removeAttribute("width");
+  svg.removeAttribute("height");
+  svg.style.width = "";
+  svg.style.height = "";
+}
+
+// Which card of the deck is showing. Kept across redraws — a theme change
+// should not send the player back to the first card — and clamped by
+// renderCards when the deck it indexes into gets shorter.
+let cardIndex = 0;
+
+function renderCards() {
+  noteCardsEl.replaceChildren();
+  cardsPositionEl.textContent = "";
+
+  // Only the note deck can come out empty — the key signatures are a fixed
+  // list, not something a clef has to have notes for.
+  if (cardMode === "notes" && currentClef.notePool.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "settings-note";
+    empty.textContent = t("cards.empty");
+    noteCardsEl.appendChild(empty);
+    return;
+  }
+
+  const deck = cardDeck();
+  cardIndex = Math.min(Math.max(cardIndex, 0), deck.length - 1);
+  const entry = deck[cardIndex];
+
+  const card = document.createElement("button");
+  card.type = "button";
+  card.className = "note-card";
+  card.setAttribute("aria-pressed", "false");
+
+  const inner = document.createElement("span");
+  inner.className = "note-card-inner";
+
+  const front = document.createElement("span");
+  front.className = "note-card-face note-card-front";
+
+  const name = document.createElement("span");
+  name.className = "note-card-name";
+
+  if (cardMode === "keys") {
+    card.dataset.tonic = entry.tonic;
+    card.setAttribute("aria-label", t(`key.${entry.id}`));
+    renderCardKeySignature(front, entry);
+    name.textContent = t(`key.${entry.id}`);
+  } else {
+    card.dataset.tonic = entry.key;
+    // The drawing on the front is out of a screen reader's reach, so the
+    // card's name is the note's — the answer, which is what the front says to
+    // everyone who can see it.
+    card.setAttribute("aria-label", noteLabel(currentClef, entry.key));
+    // The geometry is measured across the whole deck rather than this one
+    // note, so the staff keeps the same size and the same middle line from
+    // card to card — otherwise a note with ledger lines would shift the staff
+    // under the player as they step through.
+    renderCardStaff(
+      front,
+      entry,
+      staffGeometry(
+        currentClef,
+        deck.map((note) => diatonicStep(note.key)),
+      ),
+    );
+    name.textContent = cardNoteName(entry);
+  }
+
+  const back = document.createElement("span");
+  back.className = "note-card-face note-card-back";
+  back.appendChild(name);
+
+  inner.append(front, back);
+  card.appendChild(inner);
+  noteCardsEl.appendChild(card);
+
+  cardsPositionEl.textContent = t("cards.position", {
+    index: cardIndex + 1,
+    total: deck.length,
+  });
+}
+
+// Moves on through the deck, wrapping at the end: a deck worked through with
+// one key has no last page to be stranded on, and the position line says where
+// you are. The card is rebuilt, which turns it back face-up — the next one is
+// a new question, not the previous answer.
+function stepCard(delta) {
+  const total = cardDeck().length;
+  if (total === 0) return;
+  cardIndex = (cardIndex + delta + total) % total;
+  renderCards();
+}
+
+// Note colours are read from CSS at draw time and the deck follows the clef
+// and the range, so anything that moves those redraws the cards — but only
+// while they are the screen being looked at.
+function redrawCards() {
+  if (!cardsScreen.hidden) renderCards();
+}
+
+// How long the answer stays up before the deck moves on. Long enough to read a
+// name and hear the note under it; a second press cuts it short.
+const CARD_REVEAL_MS = 1600;
+let cardAdvanceTimer = null;
+
+function clearCardAdvance() {
+  if (cardAdvanceTimer === null) return;
+  clearTimeout(cardAdvanceTimer);
+  cardAdvanceTimer = null;
+}
+
+// The whole deck is worked through with one key. A press turns the card over
+// and sounds it, and the deck moves on by itself a moment later; a press while
+// the answer is up skips that wait, so reading fast is never held up by the
+// timer.
+function revealOrAdvance() {
+  const card = noteCardsEl.querySelector(".note-card");
+  if (!card) return;
+
+  clearCardAdvance();
+
+  if (card.classList.contains("flipped")) {
+    stepCard(1);
+    return;
+  }
+
+  card.classList.add("flipped");
+  card.setAttribute("aria-pressed", "true");
+  // Hearing the card alongside its name is half of what the deck is for: the
+  // note itself, or the note a key is built on.
+  playPianoNote(card.dataset.tonic);
+  cardAdvanceTimer = setTimeout(() => {
+    cardAdvanceTimer = null;
+    stepCard(1);
+  }, CARD_REVEAL_MS);
+}
+
+noteCardsEl.addEventListener("click", (event) => {
+  if (!event.target.closest(".note-card")) return;
+  revealOrAdvance();
+});
+
+window.addEventListener("keydown", (event) => {
+  if (cardsScreen.hidden || !appSettingsMenu.hidden) return;
+  if (event.key !== " " && event.code !== "Space") return;
+  // Stops the page scrolling — and stops a card that has the focus being
+  // activated a second time by the click a Space on a button leaves behind.
+  event.preventDefault();
+  revealOrAdvance();
+});
+
 function showScreen(screen) {
-  for (const s of [setupScreen, gameScreen, resultsScreen]) {
+  // Leaving the cards screen cancels an advance that has not fired yet.
+  clearCardAdvance();
+  // One way out, in the same place on every screen. The menu is the one screen
+  // there is nothing behind, so it is the one screen without it.
+  toolbarBack.hidden = screen === menuScreen;
+  for (const s of [
+    menuScreen,
+    setupScreen,
+    cardsScreen,
+    noteChartScreen,
+    keyChartScreen,
+    gameScreen,
+    keysScreen,
+    resultsScreen,
+  ]) {
     s.hidden = s !== screen;
   }
 }
 
-function showSetup() {
+// The start screen: one entry per thing the app can do. Everything else is
+// reached from here, and every other screen has a way back to it.
+function showMenu() {
   gameActive = false;
+  showScreen(menuScreen);
+}
+
+// The note-count picker is shared: which game it starts is whichever one led
+// here. The title names that game, and it names it through data-i18n rather
+// than by being written directly, so a language change re-translates the right
+// string.
+function showSetup(mode = gameMode) {
+  gameActive = false;
+  gameMode = mode;
+  setupTitleEl.dataset.i18n =
+    mode === "keys" ? "setup.titleKeys" : "setup.title";
+  setupTitleEl.textContent = t(setupTitleEl.dataset.i18n);
+  buildNoteCountOptions();
   showScreen(setupScreen);
 }
 
-function beginGame(noteCount) {
-  totalNotes = noteCount;
-  showScreen(gameScreen);
-  startGame();
+// The heading names the deck being shown, and it names it through data-i18n
+// rather than by being written directly, so a language change re-translates
+// the right string. The hint is the same for both decks: it describes the one
+// key that works them, not what is on the cards.
+function showCards(mode = "notes") {
+  gameActive = false;
+  cardMode = mode;
+  cardsTitleEl.dataset.i18n =
+    mode === "keys" ? "cards.titleKeys" : "cards.title";
+  cardsTitleEl.textContent = t(cardsTitleEl.dataset.i18n);
+  cardIndex = 0;
+  renderCards();
+  showScreen(cardsScreen);
+}
+
+// The notes of the tune when the round in progress is the melody, null when it
+// is a run of random ones. It is what tells the round apart afterwards — for
+// the replay on the results screen, for a restart on a clef change, and for
+// the playback that ends it.
+let melodyRound = null;
+
+function beginGame(questionCount) {
+  melodyRound = null;
+  totalNotes = questionCount;
+  if (gameMode === "keys") {
+    showScreen(keysScreen);
+    startKeysGame();
+  } else {
+    showScreen(gameScreen);
+    startGame();
+  }
   gameActive = true;
+}
+
+function beginMelody() {
+  const notes = melodyNotes(currentClef);
+  if (notes.length === 0) return;
+  gameMode = "notes";
+  melodyRound = notes;
+  totalNotes = notes.length;
+  showScreen(gameScreen);
+  startGame(notes.map((entry) => entry.note));
+  gameActive = true;
+}
+
+// Starts the round in progress over: a clef change makes the notes on screen
+// unreadable in the new clef, and the melody has to be placed in it afresh.
+function restartRound() {
+  if (gameMode === "keys") {
+    startKeysGame();
+  } else if (melodyRound) {
+    beginMelody();
+  } else {
+    startGame();
+  }
+}
+
+// Whatever is on screen, redrawn for a new palette, a new clef or a new
+// window width. Both games read their colours from CSS at draw time.
+function redrawCurrentGame() {
+  if (gameMode === "keys") {
+    renderKeysRound();
+  } else {
+    renderNotation();
+  }
 }
 
 // The closing emoji reacts to how clean the round was. Accuracy is the right
@@ -1111,6 +2158,9 @@ function renderResults(accuracy) {
 
 function endGame() {
   gameActive = false;
+  markPlayed(gameMode, melodyRound ? MELODY_ID : totalNotes);
+  // Every note of it has now been named; the reward is hearing what they were.
+  if (melodyRound) playMelody(melodyRound);
 
   const total = correct + wrong;
   lastAccuracy = total > 0 ? Math.round((correct / total) * 100) : 0;
@@ -1122,10 +2172,27 @@ window.addEventListener("keydown", (event) => {
   // The settings dialog owns the keyboard while it is open, so a stray letter
   // there is not counted as an answer.
   if (!appSettingsMenu.hidden) return;
-  // On the results screen, Tab quickly replays the same number of notes.
+  // On the results screen, Tab quickly replays the same round — of whichever
+  // game the round that just ended belonged to.
   if (event.key === "Tab" && !resultsScreen.hidden) {
     event.preventDefault();
-    beginGame(totalNotes);
+    if (melodyRound) {
+      beginMelody();
+    } else {
+      beginGame(totalNotes);
+    }
+    return;
+  }
+  // The key game is answered by 1-4, which count along the options from the
+  // left; the note game by the letter naming a note. Neither is meaningful in
+  // the other. The numbers are not drawn on the options — they would be four
+  // more things to read on a screen that is already asking one question — so
+  // this is a shortcut for whoever finds it, not the advertised way in.
+  if (gameMode === "keys") {
+    const choice = Number(event.key);
+    if (!Number.isInteger(choice) || choice < 1 || choice > KEY_CHOICES) return;
+    const btn = keyOptionsEl.children[choice - 1];
+    if (btn) handleKeyGuess(btn.dataset.key);
     return;
   }
   const key = event.key.toLowerCase();
@@ -1137,6 +2204,11 @@ noteCountOptionsEl.addEventListener("click", (event) => {
   const btn = event.target.closest("[data-count]");
   if (!btn) return;
   beginGame(Number(btn.dataset.count));
+});
+
+setupMelodyEl.addEventListener("click", (event) => {
+  if (!event.target.closest(".melody-btn")) return;
+  beginMelody();
 });
 
 // Mouse and touch are served by the drag handlers, so what is left here is the
@@ -1153,15 +2225,26 @@ rangeRowsEl.addEventListener("click", (event) => {
   setRangeFromNote(hit.dataset.key);
 });
 
-settingsResetBtn.addEventListener("click", () => {
-  // Only this clef's range is cleared: the panel edits one clef at a time, so
-  // resetting the others would be a surprise.
-  delete noteRanges[currentClef.id];
-  localStorage.setItem(RANGE_STORAGE_KEY, JSON.stringify(noteRanges));
-  buildRangeEditor();
-});
+// Wrapped rather than passed directly: showSetup takes a mode, and a listener
+// hands its own first argument — the click event — straight into it.
+playAgainBtn.addEventListener("click", () => showSetup());
 
-playAgainBtn.addEventListener("click", showSetup);
+// --- Main menu ---
+// The key-signature game (#menu-keys) is in the markup but disabled: it is
+// announced here rather than hidden, so the shape of the app is visible before
+// the game behind it exists. Give it a click handler when it does.
+document
+  .getElementById("menu-notes")
+  .addEventListener("click", () => showSetup("notes"));
+document
+  .getElementById("menu-keys")
+  .addEventListener("click", () => showSetup("keys"));
+document
+  .getElementById("menu-cards")
+  .addEventListener("click", () => showCards("notes"));
+document
+  .getElementById("menu-keycards")
+  .addEventListener("click", () => showCards("keys"));
 
 notePadEl.addEventListener("click", (event) => {
   const btn = event.target.closest("[data-note]");
@@ -1170,8 +2253,11 @@ notePadEl.addEventListener("click", (event) => {
 });
 
 window.addEventListener("resize", () => {
-  renderNotation();
+  redrawCurrentGame();
   if (!appSettingsMenu.hidden) redrawRangeStaff();
+  // The note chart's staff is measured, so it has to be redrawn at the new
+  // width; the key chart's tiles are scaled by CSS and look after themselves.
+  if (!noteChartScreen.hidden) renderNoteChart();
 });
 
 // --- Language picker (a section of the settings menu) ---
@@ -1223,8 +2309,11 @@ function applyLanguage(langId) {
   buildLangMenu();
   buildThemeMenu();
   buildClefMenu();
+  buildNoteCountOptions();
   buildRangeEditor();
-  renderNotation();
+  redrawCards();
+  redrawCharts();
+  redrawCurrentGame();
   if (gameActive) updateStatus();
   if (!resultsScreen.hidden) renderResults(lastAccuracy);
 }
@@ -1314,10 +2403,12 @@ function applyTheme(themeId) {
   themeMenu.querySelectorAll(".theme-menu-item").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.themeId === theme.id);
   });
-  renderNotation();
+  redrawCurrentGame();
   // Note colors are read from CSS at draw time, so the range staff has to be
   // redrawn for the new palette.
   if (!appSettingsMenu.hidden) redrawRangeStaff();
+  redrawCards();
+  redrawCharts();
 }
 
 buildThemeMenu();
@@ -1381,10 +2472,12 @@ function applyClef(clefId) {
   // The range is per clef, so the panel has to be redrawn for the clef that is
   // now showing.
   buildRangeEditor();
+  redrawCards();
+  redrawCharts();
   if (gameActive) {
-    startGame();
+    restartRound();
   } else {
-    renderNotation();
+    redrawCurrentGame();
   }
 }
 
@@ -1419,6 +2512,8 @@ function closeAppSettings() {
   setAppSettingsOpen(false);
 }
 
+toolbarBack.addEventListener("click", showMenu);
+
 appSettingsToggle.addEventListener("click", () => {
   setAppSettingsOpen(appSettingsMenu.hidden);
 });
@@ -1430,7 +2525,20 @@ document
   .addEventListener("click", closeAppSettings);
 
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape") closeAppSettings();
+  if (e.key !== "Escape") return;
+  // The dialog is on top, so it goes first; a second Escape then steps back
+  // out of whichever screen the menu led to. A running game is left alone —
+  // there is no half-finished round to walk out of by accident.
+  if (!appSettingsMenu.hidden) {
+    closeAppSettings();
+  } else if (
+    !cardsScreen.hidden ||
+    !setupScreen.hidden ||
+    !noteChartScreen.hidden ||
+    !keyChartScreen.hidden
+  ) {
+    showMenu();
+  }
 });
 
 buildNoteCountOptions();
@@ -1438,7 +2546,7 @@ buildRangeEditor();
 buildNotePad();
 // Last, so it can rebuild every menu above in the saved language.
 applyLanguage(currentLanguage.id);
-showSetup();
+showMenu();
 
 // --- Ambient background: rising note particles + pointer parallax ---
 const prefersReducedMotion = window.matchMedia(

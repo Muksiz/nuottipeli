@@ -334,8 +334,46 @@ body {
 
 .toolbar {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  /* Back on the left, settings on the right. With the back button hidden the
+     lone gear still sits right, which is where it has always been. */
+  justify-content: space-between;
+  gap: 8px;
   margin-bottom: 8px;
+}
+
+/* The way out of every screen but the menu, in the same place on each. Wears
+   the gear's shape so the two read as one bar rather than two controls that
+   happen to share a row. */
+.toolbar-back {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+  background: var(--toggle-bg);
+  border: 1px solid var(--toggle-border);
+  border-radius: 8px;
+  color: var(--toggle-text);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.toolbar-back:hover {
+  color: var(--note-current);
+  border-color: var(--note-current);
+}
+
+.toolbar-back:active {
+  transform: translateY(1px);
+}
+
+.toolbar-back-arrow {
+  font-size: 1rem;
+  line-height: 1;
 }
 
 /* Clef and theme are chosen once and then forgotten, so they live behind a
@@ -415,6 +453,9 @@ body {
   transition: background 0.2s ease, border-color 0.2s ease;
 }
 
+/* These set a display of their own, which outranks the `hidden` attribute's —
+   so hiding them has to be spelled out. */
+.toolbar-back[hidden],
 .app-settings-backdrop[hidden],
 .app-settings-menu[hidden] {
   display: none;
@@ -431,8 +472,7 @@ body {
   padding: 14px 18px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  justify-content: flex-end;
   background: var(--card-bg);
   border-radius: 14px 14px 0 0;
   transition: background 0.2s ease;
@@ -607,7 +647,10 @@ body {
   color: var(--status-value);
 }
 
+.menu-screen,
+.chart-screen,
 .setup-screen,
+.cards-screen,
 .results-screen {
   display: grid;
   gap: 20px;
@@ -654,8 +697,8 @@ body {
   min-width: 0;
 }
 
-/* The VexFlow staff fills the panel; the band, the ghost grip and the hit areas
-   are absolutely positioned over it, the hit areas one per note column. */
+/* The VexFlow staff fills the panel; the band and the hit areas are absolutely
+   positioned over it, the hit areas one per note column. */
 .range-staff {
   position: relative;
   width: 100%;
@@ -684,11 +727,10 @@ body {
   transition: left 0.08s ease, width 0.08s ease;
 }
 
-/* A grip on each edge, so the band reads as something to take hold of. The
-   ghost below copies this shape, so keep the two in step. */
+/* A grip on each edge, so the band reads as something to take hold of. */
 .range-band::before,
-.range-band::after,
-.range-ghost {
+.range-band::after {
+  content: "";
   position: absolute;
   top: 50%;
   width: 6px;
@@ -696,11 +738,6 @@ body {
   margin-top: -17px;
   border-radius: 3px;
   background: var(--note-current);
-}
-
-.range-band::before,
-.range-band::after {
-  content: "";
 }
 
 .range-band::before {
@@ -711,20 +748,31 @@ body {
   right: -4px;
 }
 
-/* Where the grip would come to rest if the press happened where the pointer is
-   — the same grip, dimmed. It says which end moves and where it stops, which a
-   highlight over the hovered column could not: at phone widths a column is a
-   few pixels wide, and the end that moves is often nowhere near it. Positioned
-   from script.js; left dark until there is somewhere to point at. */
-.range-ghost {
-  background: color-mix(in srgb, var(--note-current) 55%, transparent);
-  opacity: 0;
+/* The pool's note names under the staff, one centred on each notehead. They
+   are what makes the range readable without naming the notes off the staff
+   first — which is the skill the game is for, not a toll to pay in settings. */
+.range-letters {
+  position: relative;
+  height: 16px;
+  margin-top: 2px;
+  /* The staff above owns every press; a letter is a label, not a target. */
   pointer-events: none;
-  transition: left 0.08s ease, opacity 0.12s ease;
 }
 
-.range-ghost.visible {
-  opacity: 1;
+.range-letter {
+  position: absolute;
+  top: 0;
+  /* Centred on its notehead's x, which is what left is set to. */
+  transform: translateX(-50%);
+  font-size: 0.7rem;
+  line-height: 1;
+  color: var(--note-future);
+  transition: color 0.15s ease;
+}
+
+.range-letter.lit {
+  color: var(--note-current);
+  font-weight: 600;
 }
 
 .range-hit {
@@ -739,30 +787,129 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* No fill of its own on hover or on a press: the ghost grip answers where the
-   range is going, and touch sees the band itself move on the way down. What is
-   left is the focus ring, which a keyboard still needs to follow its own
-   place on the staff. */
+/* No fill of its own on hover or on a press: the band itself shows where the
+   range is going. What is left is the focus ring, which a keyboard still needs
+   to follow its own place on the staff. */
 .range-hit:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--note-current) 55%, transparent);
   outline-offset: -2px;
 }
 
-.settings-reset {
-  font-family: inherit;
-  font-size: 0.8rem;
-  background: none;
-  border: 1px solid var(--toggle-border);
-  border-radius: 8px;
-  color: var(--status-label);
-  padding: 6px 12px;
-  cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease;
+/* --- Main menu --- */
+/* The start screen: one entry per thing the app can do, each naming itself and
+   saying in a line what it is for. Two columns where there is room, one where
+   there is not. */
+
+/* Two columns, one per subject: everything about notes on the left, everything
+   about keys on the right. Each column is a group of its own rather than a run
+   of rows, so the pairing reads down the column instead of across. */
+.main-menu {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  width: 100%;
 }
 
-.settings-reset:hover {
-  color: var(--note-current);
+.menu-group {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.menu-group-heading {
+  margin: 0;
+  padding: 0 2px;
+  font-family: inherit;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--status-label);
+  text-align: left;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font: inherit;
+  /* The screen centres its text; an entry reads as a row, so it undoes that. */
+  text-align: left;
+  padding: 16px 18px;
+  background: var(--toggle-bg);
+  border: 1px solid var(--toggle-border);
+  border-radius: 14px;
+  color: var(--status-value);
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.menu-item:hover:not(:disabled) {
+  transform: translateY(-2px);
   border-color: var(--note-current);
+}
+
+.menu-item:hover:not(:disabled) .menu-icon {
+  color: var(--note-current);
+}
+
+.menu-item:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.menu-item:focus-visible {
+  outline: 2px solid var(--note-current);
+  outline-offset: 2px;
+}
+
+.menu-icon {
+  flex: none;
+  width: 2rem;
+  text-align: center;
+  font-size: 1.9rem;
+  line-height: 1;
+  color: var(--toggle-text);
+  transition: color 0.15s ease;
+}
+
+.menu-text {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.menu-name {
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: 1.15rem;
+  line-height: 1.15;
+}
+
+.menu-note {
+  font-size: 0.76rem;
+  line-height: 1.3;
+  color: var(--status-label);
+}
+
+/* Not built yet. It stays on the menu rather than being hidden, so the shape
+   of the app is visible before the game behind it exists — dimmed, unclickable
+   and wearing a badge that says as much. */
+.menu-item.locked {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.menu-badge {
+  flex: none;
+  margin-left: auto;
+  align-self: center;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: var(--note-current);
+  color: #fff;
 }
 
 .note-count-options {
@@ -773,6 +920,7 @@ body {
 }
 
 .note-count-btn {
+  position: relative;
   font-family: "DM Serif Display", Georgia, serif;
   font-size: 1.15rem;
   background: var(--toggle-bg);
@@ -784,6 +932,23 @@ body {
   transition: background 0.15s ease, transform 0.12s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
+/* Already played to the end. The tick is what carries the meaning — the colour
+   only backs it up, so the two states stay tellable apart without it. */
+.note-count-btn.played {
+  border-color: color-mix(in srgb, var(--note-past) 70%, transparent);
+  color: var(--note-past);
+}
+
+.note-count-mark {
+  position: absolute;
+  top: 3px;
+  right: 6px;
+  font-family: inherit;
+  font-size: 0.7rem;
+  line-height: 1;
+  color: var(--note-past);
+}
+
 .note-count-btn:hover {
   transform: translateY(-2px);
   border-color: var(--note-current);
@@ -792,6 +957,316 @@ body {
 
 .note-count-btn:active {
   transform: translateY(0);
+}
+
+/* --- Note cards --- */
+/* One card at a time, big enough to read across a room: the note on a staff on
+   the front, its name on the back, an arrow either side to leaf through the
+   deck. Each card's staff is an SVG with a viewBox and no fixed size, so it
+   scales to fill whatever the card is given. */
+
+.card-deck {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+  /* The flip reads as a card turning over rather than squashing sideways. */
+  perspective: 1200px;
+}
+
+.note-card-slot {
+  width: min(340px, 72vw);
+}
+
+.note-card {
+  font: inherit;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: none;
+  aspect-ratio: 1 / 1;
+  cursor: pointer;
+  border-radius: 18px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.note-card-inner {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.5s cubic-bezier(0.22, 0.7, 0.28, 1);
+}
+
+.note-card.flipped .note-card-inner {
+  transform: rotateY(180deg);
+}
+
+.note-card-face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 18px;
+  overflow: hidden;
+  /* Without this the far face shows through the near one mid-flip. */
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--card-shadow) 45%, transparent);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* The front is a scrap of the same paper the staff is drawn on elsewhere, so
+   a card reads as notation rather than as a button with a picture on it. */
+.note-card-front {
+  background: var(--notation-bg);
+  border: 1px solid var(--notation-border);
+  padding: 18px 14px;
+}
+
+.note-card-front svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 100%;
+}
+
+/* The back is the answer, so it takes the accent colour the current note wears
+   on the staff — the card lights up as it turns. */
+.note-card-back {
+  transform: rotateY(180deg);
+  color: #fff;
+  border: 1px solid transparent;
+  background: linear-gradient(
+    150deg,
+    color-mix(in srgb, var(--note-current) 88%, #fff),
+    color-mix(in srgb, var(--note-current) 82%, #000)
+  );
+}
+
+.note-card-name {
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: clamp(3rem, 14vw, 5rem);
+  line-height: 1;
+  letter-spacing: 0.01em;
+}
+
+.note-card:hover .note-card-front {
+  border-color: var(--note-current);
+}
+
+.note-card:hover .note-card-face {
+  box-shadow: 0 14px 30px color-mix(in srgb, var(--card-shadow) 60%, transparent);
+}
+
+.note-card:focus-visible {
+  outline: 2px solid var(--note-current);
+  outline-offset: 4px;
+}
+
+.deck-position {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--status-label);
+}
+
+/* --- Reference charts --- */
+/* Lookup pages rather than games: the clef's whole pool on one staff, and every
+   key signature drawn in that clef. */
+
+/* Which clef the chart is showing. A chart read in the wrong clef is worse
+   than no chart, so it says so above the notation rather than nowhere. */
+.chart-clef {
+  margin: 0;
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--status-label);
+}
+
+.chart-staff-wrap {
+  width: 100%;
+  min-width: 0;
+  /* Side padding keeps the outermost ledger lines off the box's edge; the
+     staff and its letters are both measured inside it, so they stay aligned. */
+  padding: 10px 12px 4px;
+  border-radius: 12px;
+  background: var(--notation-bg);
+  border: 1px solid var(--notation-border);
+  transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+.key-chart {
+  display: grid;
+  gap: 20px;
+  width: 100%;
+}
+
+.key-chart-group {
+  display: grid;
+  gap: 10px;
+}
+
+.key-chart-heading {
+  margin: 0;
+  font-family: inherit;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--status-label);
+  text-align: left;
+}
+
+.key-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.key-chart-tile {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  padding: 8px 6px;
+  border-radius: 10px;
+  background: var(--notation-bg);
+  border: 1px solid var(--notation-border);
+  transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+.key-chart-staff {
+  width: 100%;
+  line-height: 0;
+}
+
+.key-chart-staff svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.key-chart-name {
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: 1.05rem;
+  line-height: 1;
+  color: var(--status-value);
+}
+
+/* --- Key signature game --- */
+/* The staff carries only a clef and the accidentals; everything the player has
+   to weigh up is in those, so the answers get the room instead. */
+
+.keys-prompt {
+  margin: 0;
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: 1.35rem;
+  color: var(--status-value);
+}
+
+.key-options {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  width: 100%;
+}
+
+.key-option {
+  display: grid;
+  place-items: center;
+  font: inherit;
+  padding: 14px 8px;
+  background: var(--toggle-bg);
+  border: 1px solid var(--toggle-border);
+  border-radius: 12px;
+  color: var(--status-value);
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.key-option:hover {
+  transform: translateY(-2px);
+  border-color: var(--note-current);
+  color: var(--note-current);
+}
+
+.key-option:active {
+  transform: translateY(0);
+}
+
+.key-option:focus-visible {
+  outline: 2px solid var(--note-current);
+  outline-offset: 2px;
+}
+
+.key-option-name {
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+/* A wrong pick shakes where it was pressed, so the answer that was rejected is
+   the one that moves — the staff shakes too, but it is not what was aimed at. */
+.key-option.wrong {
+  animation: wrong-shake 400ms ease;
+  border-color: var(--note-current);
+}
+
+/* A round of a fixed length like the numbers above it, but a tune rather than a
+   number, so it gets a row of its own under them. */
+.setup-melody {
+  width: 100%;
+}
+
+.melody-btn {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  width: 100%;
+  font-family: inherit;
+  padding: 12px 14px;
+  background: var(--toggle-bg);
+  border: 1px solid var(--toggle-border);
+  border-radius: 10px;
+  color: var(--status-value);
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.melody-btn:hover {
+  transform: translateY(-2px);
+  border-color: var(--note-current);
+  color: var(--note-current);
+}
+
+.melody-btn:active {
+  transform: translateY(0);
+}
+
+.melody-btn:focus-visible {
+  outline: 2px solid var(--note-current);
+  outline-offset: 2px;
+}
+
+.melody-btn.played {
+  border-color: color-mix(in srgb, var(--note-past) 70%, transparent);
+  color: var(--note-past);
+}
+
+.melody-name {
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: 1.15rem;
+  line-height: 1.1;
+}
+
+.melody-composer {
+  font-size: 0.72rem;
+  color: var(--status-label);
 }
 
 .results-stats {
@@ -824,6 +1299,10 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
   .results-face {
+    animation: none;
+  }
+
+  .key-option.wrong {
     animation: none;
   }
 }
@@ -973,10 +1452,10 @@ body {
     transform: none;
   }
 
-  /* The band and its preview should still land where the finger is, just
-     without easing. */
+  /* The band should still land where the finger is, just without easing. The
+     cards still turn over — they simply arrive at the far side at once. */
   .range-band,
-  .range-ghost {
+  .note-card-inner {
     transition: none;
   }
 }
@@ -993,6 +1472,23 @@ body {
 
   .note-count-options {
     grid-template-columns: repeat(3, 1fr);
+  }
+
+  /* Four across leaves each answer too narrow to read at a glance. */
+  .key-options {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .key-chart-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .main-menu {
+    grid-template-columns: 1fr;
+  }
+
+  .note-card-slot {
+    width: min(300px, 78vw);
   }
 
   .app-settings-cols {
@@ -1077,8 +1573,9 @@ body {
     color: var(--note-current);
   }
 
-  /* The "press Tab" hint is meaningless without a keyboard. */
-  .screen-hint {
+  /* The "press Tab" hint is meaningless without a keyboard. Only that one —
+     the note cards' hint is about tapping, so it belongs here most of all. */
+  .results-screen .screen-hint {
     display: none;
   }
 }

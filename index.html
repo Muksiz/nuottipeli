@@ -18,6 +18,10 @@
     <div class="notes-layer" aria-hidden="true"></div>
     <main class="app">
       <div class="toolbar">
+        <button type="button" class="toolbar-back" id="toolbar-back" hidden>
+          <span class="toolbar-back-arrow" aria-hidden="true">←</span>
+          <span data-i18n="nav.back">Takaisin</span>
+        </button>
         <div class="app-settings" id="app-settings">
           <button
             id="app-settings-toggle"
@@ -42,14 +46,6 @@
             hidden
           >
             <div class="app-settings-bar">
-              <button
-                type="button"
-                class="settings-reset"
-                id="settings-reset"
-                data-i18n="settings.reset"
-              >
-                Palauta oletukset
-              </button>
               <button
                 type="button"
                 class="app-settings-done"
@@ -103,7 +99,76 @@
         </div>
       </div>
 
-      <section class="screen setup-screen" id="setup-screen">
+      <section class="screen menu-screen" id="menu-screen">
+        <div class="main-menu">
+          <section class="menu-group" aria-labelledby="menu-group-notes">
+            <h2 class="menu-group-heading" id="menu-group-notes" data-i18n="menu.groupNotes">
+              Nuotit
+            </h2>
+            <button type="button" class="menu-item" id="menu-notes">
+              <span class="menu-icon" aria-hidden="true">𝄞</span>
+              <span class="menu-text">
+                <span class="menu-name" data-i18n="menu.notes">Tunnista nuotit</span>
+                <span class="menu-note" data-i18n="menu.notesNote">
+                  Nimeä nuotit yksi kerrallaan.
+                </span>
+              </span>
+            </button>
+            <button type="button" class="menu-item" id="menu-cards">
+              <span class="menu-icon" aria-hidden="true">♬</span>
+              <span class="menu-text">
+                <span class="menu-name" data-i18n="menu.cards">Nuottikortit</span>
+                <span class="menu-note" data-i18n="menu.cardsNote">
+                  Selaa nuotteja kortteina ja käännä nimi esiin.
+                </span>
+              </span>
+            </button>
+            <button type="button" class="menu-item" id="menu-notechart">
+              <span class="menu-icon" aria-hidden="true">♩</span>
+              <span class="menu-text">
+                <span class="menu-name" data-i18n="menu.noteChart">Nuottitaulukko</span>
+                <span class="menu-note" data-i18n="menu.noteChartNote">
+                  Kaikki nuotit yhdellä silmäyksellä.
+                </span>
+              </span>
+            </button>
+          </section>
+          <section class="menu-group" aria-labelledby="menu-group-keys">
+            <h2 class="menu-group-heading" id="menu-group-keys" data-i18n="menu.groupKeys">
+              Sävellajit
+            </h2>
+            <button type="button" class="menu-item" id="menu-keys">
+              <span class="menu-icon" aria-hidden="true">♯</span>
+              <span class="menu-text">
+                <span class="menu-name" data-i18n="menu.keys">Tunnista sävellaji</span>
+                <span class="menu-note" data-i18n="menu.keysNote">
+                  Päättele sävellaji etumerkinnästä.
+                </span>
+              </span>
+            </button>
+            <button type="button" class="menu-item" id="menu-keycards">
+              <span class="menu-icon" aria-hidden="true">♭</span>
+              <span class="menu-text">
+                <span class="menu-name" data-i18n="menu.keyCards">Sävellajikortit</span>
+                <span class="menu-note" data-i18n="menu.keyCardsNote">
+                  Selaa sävellajeja kortteina ja käännä nimi esiin.
+                </span>
+              </span>
+            </button>
+            <button type="button" class="menu-item" id="menu-keychart">
+              <span class="menu-icon" aria-hidden="true">♮</span>
+              <span class="menu-text">
+                <span class="menu-name" data-i18n="menu.keyChart">Sävellajitaulukko</span>
+                <span class="menu-note" data-i18n="menu.keyChartNote">
+                  Kaikki sävellajit yhdellä silmäyksellä.
+                </span>
+              </span>
+            </button>
+          </section>
+        </div>
+      </section>
+
+      <section class="screen setup-screen" id="setup-screen" hidden>
         <h1 class="screen-title" id="setup-title" data-i18n="setup.title">
           Valitse nuottien määrä.
         </h1>
@@ -114,7 +179,26 @@
             role="group"
             aria-labelledby="setup-title"
           ></div>
+          <div class="setup-melody" id="setup-melody"></div>
         </div>
+      </section>
+
+      <section class="screen cards-screen" id="cards-screen" hidden>
+        <h1 class="screen-title" id="cards-title" data-i18n="cards.title">
+          Nuottikortit
+        </h1>
+        <p class="screen-hint" data-i18n="cards.hint">
+          Paina välilyöntiä tai napauta korttia. Kortti vaihtuu itsestään.
+        </p>
+        <div class="card-deck">
+          <div
+            class="note-card-slot"
+            id="note-cards"
+            role="group"
+            aria-labelledby="cards-title"
+          ></div>
+        </div>
+        <p class="deck-position" id="cards-position" aria-live="polite"></p>
       </section>
 
       <section class="screen game" id="game-screen" hidden>
@@ -140,6 +224,53 @@
           aria-label="Nuottipainikkeet"
           data-i18n-aria="game.notePad"
         ></div>
+      </section>
+
+      <section class="screen chart-screen" id="note-chart-screen" hidden>
+        <h1 class="screen-title" id="note-chart-title" data-i18n="menu.noteChart">
+          Nuottitaulukko
+        </h1>
+        <p class="chart-clef" id="note-chart-clef"></p>
+        <div class="chart-staff-wrap">
+          <div class="range-staff" id="note-chart-staff"></div>
+          <div class="range-letters" id="note-chart-letters"></div>
+        </div>
+      </section>
+
+      <section class="screen chart-screen" id="key-chart-screen" hidden>
+        <h1 class="screen-title" id="key-chart-title" data-i18n="menu.keyChart">
+          Sävellajitaulukko
+        </h1>
+        <p class="chart-clef" id="key-chart-clef"></p>
+        <div class="key-chart" id="key-chart"></div>
+      </section>
+
+      <section class="screen game keys-screen" id="keys-screen" hidden>
+        <div class="progress" id="keys-progress"></div>
+        <div class="notation-area" id="keys-notation" aria-live="polite"></div>
+        <p class="keys-prompt" id="keys-prompt" data-i18n="keys.prompt">
+          Mikä sävellaji?
+        </p>
+        <div
+          class="key-options"
+          id="key-options"
+          role="group"
+          aria-labelledby="keys-prompt"
+        ></div>
+        <div class="status">
+          <div class="status-row">
+            <span data-i18n="game.correct">Oikein</span>
+            <strong id="keys-score">0</strong>
+          </div>
+          <div class="status-row">
+            <span data-i18n="game.wrong">Väärin</span>
+            <strong id="keys-mistakes">0</strong>
+          </div>
+          <div class="status-row">
+            <span data-i18n="game.streak">Putki</span>
+            <strong id="keys-streak">0</strong>
+          </div>
+        </div>
       </section>
 
       <section class="screen results-screen" id="results-screen" hidden>
