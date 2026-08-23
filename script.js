@@ -2905,7 +2905,12 @@ window.addEventListener("keydown", (event) => {
   if (event.key !== " " && event.code !== "Space") return;
   // Stops the page scrolling — and stops a card that has the focus being
   // activated a second time by the click a Space on a button leaves behind.
+  // Above the repeat guard rather than below it, since a held Space would go
+  // on scrolling the page on every repeat this handler declined to act on.
   event.preventDefault();
+  // A held Space would riffle through the deck several cards a second, each
+  // one flipped and gone before it could be read. One press, one card.
+  if (event.repeat) return;
   revealOrAdvance();
 });
 
