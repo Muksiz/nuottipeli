@@ -260,7 +260,7 @@ const STRINGS = {
     "chart.sharps": "H\u00f6jningstecken",
     "chart.flats": "S\u00e4nkningstecken",
     "menu.keyCards": "Tonartskort",
-    "menu.keyCardsNote": "Bl\u00e4ddra bland tonarterna som kort och v\u00e4nd fram namnet.",
+    "menu.keyCardsNote": "Bl\u00e4ddra bland tonarterna och v\u00e4nd fram namnet.",
     "menu.keys": "K\u00e4nn igen tonarten",
     "menu.keysNote": "Lista ut tonarten utifr\u00e5n f\u00f6rtecknen.",
     "nav.back": "Tillbaka",
