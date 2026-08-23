@@ -1268,6 +1268,13 @@ function renderRangeStaff(staffEl) {
   );
   staffEl.appendChild(band);
 
+  // The hover preview, placed by updateRangeGhost once there is a pointer to
+  // place it under.
+  const ghost = document.createElement("div");
+  ghost.className = "range-ghost";
+  ghost.hidden = true;
+  staffEl.appendChild(ghost);
+
   // Kept for the drag, which repositions the band without redrawing the staff.
   staffEl.dataset.noteGap = String(gap);
 
@@ -1298,6 +1305,11 @@ function renderRangeStaff(staffEl) {
     xs,
     (i) => steps[i] >= low && steps[i] <= high,
   );
+
+  // A redraw usually follows an edit made with the mouse still on the staff,
+  // and the preview has to answer for the range as it now stands rather than
+  // wait for the pointer to move again.
+  updateRangeGhost(staffEl);
 }
 
 // A pool's note names spelled out under its staff, each centred on its own
@@ -1493,6 +1505,9 @@ rangeRowsEl.addEventListener("pointerdown", (event) => {
     moved: false,
   };
   drawDragBand();
+  // The band itself is now the thing to watch; a preview beside it would only
+  // be a second answer to the same question.
+  updateRangeGhost(staffEl);
 });
 
 // On the window rather than the staff: the first move has to be seen before
@@ -1531,6 +1546,85 @@ window.addEventListener("pointercancel", (event) => {
   endRangeDrag();
   positionRangeBand(band, columns, gap, committed);
 });
+
+// --- Where a press would land ---
+// The band wears a grip at each end; hovering draws that grip again in the
+// faded colour the out-of-range notes wear, at the note the pointer is over.
+// So a press is aimed rather than guessed at: the ghost says both which end
+// would move — the nearer one, as ever — and where it would come to rest,
+// including where it stops short because the other end is in the way.
+//
+// Mouse only. A finger has nowhere to hover, and the styles keep the preview
+// out of touch devices whatever this code does.
+
+// Mirrored from .range-ghost in styles.css: the grip is 6px wide and hangs
+// 4px past the band edge it belongs to, which is what makes the ghost land on
+// the same pixels as the grip it stands in for.
+const RANGE_GRIP_WIDTH = 6;
+const RANGE_GRIP_OVERHANG = 4;
+
+// Where the pointer last was, as an offset into the staff. Null whenever there
+// is nothing hovering it — which is also what a redraw reads to decide whether
+// to put a preview back.
+let rangeHoverX = null;
+
+// Where the ghost belongs, or null when there is nothing to show: no pointer
+// on the staff, a drag already under way — the band is the thing to watch by
+// then — or a press that would leave the range exactly as it is.
+function ghostLeft(staffEl) {
+  if (rangeDrag || rangeHoverX === null) return null;
+
+  const range = rangeFor(currentClef);
+  const columns = staffColumns(staffEl);
+  if (!range || columns.length === 0) return null;
+
+  const key = columnKeyAt(columns, rangeHoverX);
+  const edge = edgeNearest(range, key);
+  const moved = rangeWithEdgeAt(range, edge, key);
+  if (moved.low === range.low && moved.high === range.high) return null;
+
+  const column = columns.find((col) => col.key === moved[edge]);
+  if (!column) return null;
+
+  // The band reaches bandPad past its outermost noteheads and each grip hangs
+  // over that edge from outside, so the low one sits left of the band's left
+  // edge and the high one right of its right edge.
+  const pad = bandPad(Number(staffEl.dataset.noteGap) || 0);
+  return edge === "low"
+    ? column.x - pad - RANGE_GRIP_OVERHANG
+    : column.x + pad + RANGE_GRIP_OVERHANG - RANGE_GRIP_WIDTH;
+}
+
+function updateRangeGhost(staffEl) {
+  const ghost = staffEl.querySelector(".range-ghost");
+  if (!ghost) return;
+  const left = ghostLeft(staffEl);
+  if (left !== null) ghost.style.left = `${left}px`;
+  ghost.hidden = left === null;
+}
+
+// Forgets the pointer and takes the preview down with it: on the way out of
+// the staff, and whenever the dialog opens or closes on a stale position.
+function clearRangeHover() {
+  rangeHoverX = null;
+  const staffEl = rangeRowsEl.querySelector(".range-staff");
+  if (staffEl) updateRangeGhost(staffEl);
+}
+
+rangeRowsEl.addEventListener("pointermove", (event) => {
+  if (event.pointerType !== "mouse") return;
+  // The letters under the staff are a label rather than a target, and passing
+  // over them is leaving the control.
+  const staffEl = event.target.closest(".range-staff");
+  if (!staffEl) {
+    clearRangeHover();
+    return;
+  }
+  rangeHoverX = offsetXOf(staffEl, event);
+  updateRangeGhost(staffEl);
+});
+
+rangeRowsEl.addEventListener("pointerleave", clearRangeHover);
 
 function buildNotePad() {
   if (!notePadEl) return;
@@ -2739,6 +2833,9 @@ clefMenu.addEventListener("click", (e) => {
 // Clef, theme and note ranges are all set once and then forgotten, so none of
 // them sit on screen for the whole game: the gear button opens them together.
 function setAppSettingsOpen(open) {
+  // The staff is about to appear under, or vanish from under, a pointer that
+  // has not moved: whatever it was hovering no longer holds.
+  clearRangeHover();
   appSettingsMenu.hidden = !open;
   appSettingsBackdrop.hidden = !open;
   appSettingsToggle.setAttribute("aria-expanded", String(open));
