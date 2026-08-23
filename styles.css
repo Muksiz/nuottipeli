@@ -879,8 +879,30 @@ body {
 .main-menu {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+  /* One row per entry in the longest column, headings included — the groups
+     are subgrids of these rows, so an entry is as tall as the tallest entry
+     beside it and the three columns stay in step. Each column sized itself
+     before, which held only as long as every description wrapped to the same
+     number of lines: Swedish "Alla tonarter på en gång." takes two where the
+     notes column's takes one, and everything below it fell out of line. Keep
+     the count at the longest column's entries plus its heading. */
+  grid-template-rows: repeat(4, auto);
+  column-gap: 12px;
+  /* Matches .menu-group's own gap, which as a subgrid overrides this one for
+     the rows it spans; the two are the same number so the seam never shows. */
+  row-gap: 10px;
   width: 100%;
+}
+
+.menu-group {
+  display: grid;
+  /* Every row of .main-menu, taking their heights from it rather than from
+     this column's own entries. A group with fewer entries — intervals has
+     one — simply leaves the rows past its last one empty. */
+  grid-row: 1 / -1;
+  grid-template-rows: subgrid;
+  gap: 10px;
+  align-content: start;
 }
 
 /* Three columns inside the 720px card leave each about 210px — close to what
@@ -889,13 +911,17 @@ body {
 @media (max-width: 760px) {
   .main-menu {
     grid-template-columns: 1fr;
+    /* Stacked, there is nothing to line up with: each group is a plain grid
+       again, sizing its own rows, and the gap goes back to the one between
+       groups rather than the one between entries. */
+    grid-template-rows: none;
+    row-gap: 12px;
   }
-}
 
-.menu-group {
-  display: grid;
-  gap: 10px;
-  align-content: start;
+  .menu-group {
+    grid-row: auto;
+    grid-template-rows: none;
+  }
 }
 
 .menu-group-heading {
