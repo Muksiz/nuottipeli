@@ -81,32 +81,150 @@ function playErrorTone(duration = 0.35) {
   }
 }
 
-// --- Ode to Joy ---
-// The "Freude" theme from the finale of Beethoven's Ninth (1824), long out of
-// copyright. Written as offsets in diatonic steps from the note the tune opens
-// on, plus each note's length in beats: the offsets place it in whatever clef
-// is showing, and the beats are only used when the finished tune is played
-// back — the staff draws it as plain quarter notes like every other round.
+// --- Melodies ---
+// The round-length picker offers a handful of rounds that are a tune rather
+// than a number. Each one is written as offsets in diatonic steps from the
+// note it opens on, paired with that note's length in beats: the offsets place
+// the tune in whatever clef is showing, and the beats are used only when the
+// finished tune is played back — the staff draws it as plain quarter notes
+// like every other round. An offset of `null` is a rest: it keeps its place in
+// the playback and is not a note to name, so it never reaches the staff.
 //
-// The tune can only be moved by whole octaves. Every note here is a natural
-// and no clef's pool has accidentals, so shifting it by anything else would
-// change the tune rather than transpose it.
-const ODE_TO_JOY = [
-  [0, 1], [0, 1], [1, 1], [2, 1],
-  [2, 1], [1, 1], [0, 1], [-1, 1],
-  [-2, 1], [-2, 1], [-1, 1], [0, 1],
-  [0, 1.5], [-1, 0.5], [-1, 2],
-  [0, 1], [0, 1], [1, 1], [2, 1],
-  [2, 1], [1, 1], [0, 1], [-1, 1],
-  [-2, 1], [-2, 1], [-1, 1], [0, 1],
-  [-1, 1.5], [-2, 0.5], [-2, 2],
+// A tune can only be moved by whole octaves. Every note here is a natural and
+// no clef's pool has accidentals, so shifting one by anything else would
+// change the tune rather than transpose it. `opensOn` is the letter of the
+// note at offset 0, and the candidate octaves are counted from it.
+//
+// Every tune is out of copyright — folk melodies and two dated compositions.
+// They are listed narrowest span first and then shortest, because the span is
+// what makes a tune hard to read and the picker is read from the top down.
+const MELODIES = [
+  {
+    // Maijall' oli karitsa / Mary Had a Little Lamb — American traditional,
+    // 1830s. Five notes, C to G, and the tune every beginner book opens with.
+    id: "mary-lamb",
+    opensOn: "e",
+    notes: [
+      [0, 1], [-1, 1], [-2, 1], [-1, 1],
+      [0, 1], [0, 1], [0, 2],
+      [-1, 1], [-1, 1], [-1, 2],
+      [0, 1], [2, 1], [2, 2],
+      [0, 1], [-1, 1], [-2, 1], [-1, 1],
+      [0, 1], [0, 1], [0, 1], [0, 1],
+      [-1, 1], [-1, 1], [0, 1], [-1, 1],
+      [-2, 4],
+    ],
+  },
+  {
+    // Kulkuset / Jingle Bells — James Lord Pierpont, 1857. The chorus once
+    // through, to the end of "one-horse open sleigh". The quarter rests after
+    // each "jingle bells" are part of the tune, not padding: the gap is what
+    // the phrase is heard by.
+    id: "jingle-bells",
+    opensOn: "e",
+    notes: [
+      [0, 1], [0, 1], [0, 1], [null, 1],
+      [0, 1], [0, 1], [0, 1], [null, 1],
+      [0, 1], [2, 1], [-2, 1.5], [-1, 0.5],
+      [0, 3], [null, 1],
+      [1, 1], [1, 1], [1, 1.5], [1, 0.5],
+      [1, 1], [0, 1], [0, 1], [0, 0.5], [0, 0.5],
+      [0, 1], [-1, 1], [-1, 1], [0, 1],
+      [-1, 2], [2, 2],
+    ],
+  },
+  {
+    // Oodi ilolle — the "Freude" theme from the finale of Beethoven's Ninth
+    // (1824). It opens on the third of the scale, so its candidate octaves are
+    // the Es the clef can reach.
+    id: "ode-to-joy",
+    opensOn: "e",
+    notes: [
+      [0, 1], [0, 1], [1, 1], [2, 1],
+      [2, 1], [1, 1], [0, 1], [-1, 1],
+      [-2, 1], [-2, 1], [-1, 1], [0, 1],
+      [0, 1.5], [-1, 0.5], [-1, 2],
+      [0, 1], [0, 1], [1, 1], [2, 1],
+      [2, 1], [1, 1], [0, 1], [-1, 1],
+      [-2, 1], [-2, 1], [-1, 1], [0, 1],
+      [-1, 1.5], [-2, 0.5], [-2, 2],
+    ],
+  },
+  {
+    // Ukko Nooa / Gubben Noak — Swedish traditional, the words Bellman's
+    // (1766). The tune Finnish and Swedish piano schools start on, because it
+    // asks for nothing but the five white keys from C to G. Form is A B B' A.
+    id: "ukko-nooa",
+    opensOn: "c",
+    notes: [
+      [0, 1], [0, 1], [0, 1], [2, 1],
+      [1, 1], [1, 1], [1, 1], [3, 1],
+      [2, 1], [2, 1], [1, 1], [1, 1], [0, 2],
+      [2, 1], [2, 1], [2, 1], [2, 1], [4, 1], [3, 2],
+      [1, 1], [1, 1], [1, 1], [1, 1], [3, 1], [2, 2],
+      [0, 1], [0, 1], [0, 1], [2, 1],
+      [1, 1], [1, 1], [1, 1], [3, 1],
+      [2, 1], [2, 1], [1, 1], [1, 1], [0, 2],
+    ],
+  },
+  {
+    // Piippolan vaari / Old MacDonald — English traditional. Two verses' worth
+    // of the strain, each ending on a held note and a rest.
+    id: "old-macdonald",
+    opensOn: "g",
+    notes: [
+      [0, 1], [0, 1], [0, 1], [-3, 1],
+      [-2, 1], [-2, 1], [-3, 2],
+      [2, 1], [2, 1], [1, 1], [1, 1],
+      [0, 2], [null, 2],
+      [0, 1], [0, 1], [0, 1], [-3, 1],
+      [-2, 1], [-2, 1], [-3, 2],
+      [2, 1], [2, 1], [1, 1], [1, 1],
+      [0, 2], [null, 2],
+    ],
+  },
+  {
+    // Tuiki tuiki tähtönen / Blinka lilla stjärna — the French melody "Ah!
+    // vous dirai-je, maman" (1761). Form is A A' B B A A', which is why it is
+    // the longest round here: the middle phrase is sung twice.
+    id: "twinkle",
+    opensOn: "c",
+    notes: [
+      [0, 1], [0, 1], [4, 1], [4, 1], [5, 1], [5, 1], [4, 2],
+      [3, 1], [3, 1], [2, 1], [2, 1], [1, 1], [1, 1], [0, 2],
+      [4, 1], [4, 1], [3, 1], [3, 1], [2, 1], [2, 1], [1, 2],
+      [4, 1], [4, 1], [3, 1], [3, 1], [2, 1], [2, 1], [1, 2],
+      [0, 1], [0, 1], [4, 1], [4, 1], [5, 1], [5, 1], [4, 2],
+      [3, 1], [3, 1], [2, 1], [2, 1], [1, 1], [1, 1], [0, 2],
+    ],
+  },
+  {
+    // Jaakko kulta / Broder Jakob — French traditional. The widest span of the
+    // lot: nine steps, from the G below the opening C to the A above it, since
+    // the last phrase drops a fourth for the bells.
+    id: "frere-jacques",
+    opensOn: "c",
+    notes: [
+      [0, 1], [1, 1], [2, 1], [0, 1],
+      [0, 1], [1, 1], [2, 1], [0, 1],
+      [2, 1], [3, 1], [4, 2],
+      [2, 1], [3, 1], [4, 2],
+      [4, 0.5], [5, 0.5], [4, 0.5], [3, 0.5], [2, 1], [0, 1],
+      [4, 0.5], [5, 0.5], [4, 0.5], [3, 0.5], [2, 1], [0, 1],
+      [0, 1], [-3, 1], [0, 2],
+      [0, 1], [-3, 1], [0, 2],
+    ],
+  },
 ];
 
-const MELODY_ID = "ode-to-joy";
 // Seconds to a beat, and the pause before the played-back tune starts — long
 // enough that the note the last answer sounded has died away first.
 const MELODY_BEAT_SECONDS = 0.45;
 const MELODY_LEAD_IN_SECONDS = 0.7;
+
+function findMelody(id) {
+  return MELODIES.find((melody) => melody.id === id) ?? null;
+}
 
 // --- Clefs ---
 // Each note key maps to a rung on the diatonic ladder (7 letters per octave).
@@ -165,8 +283,21 @@ const STRINGS = {
     "setup.title": "Valitse nuottien m\u00e4\u00e4r\u00e4.",
     "setup.titleKeys": "Valitse s\u00e4vellajien m\u00e4\u00e4r\u00e4.",
     "setup.played": "{label} \u2014 pelattu l\u00e4pi",
-    "setup.melody": "Oodi ilolle",
-    "setup.melodyComposer": "Beethoven \u2014 soita koko s\u00e4velm\u00e4",
+    "setup.melodyHeading": "Tai soita koko s\u00e4velm\u00e4",
+    "melody.mary-lamb": "Maijall' oli karitsa",
+    "melody.mary-lamb.source": "Amerikkalainen kansans\u00e4velm\u00e4",
+    "melody.jingle-bells": "Kulkuset",
+    "melody.jingle-bells.source": "Pierpont, 1857",
+    "melody.ode-to-joy": "Oodi ilolle",
+    "melody.ode-to-joy.source": "Beethoven, 1824",
+    "melody.ukko-nooa": "Ukko Nooa",
+    "melody.ukko-nooa.source": "Ruotsalainen kansans\u00e4velm\u00e4",
+    "melody.old-macdonald": "Piippolan vaari",
+    "melody.old-macdonald.source": "Englantilainen kansans\u00e4velm\u00e4",
+    "melody.twinkle": "Tuiki tuiki t\u00e4ht\u00f6nen",
+    "melody.twinkle.source": "Ranskalainen kansans\u00e4velm\u00e4",
+    "melody.frere-jacques": "Jaakko kulta",
+    "melody.frere-jacques.source": "Ranskalainen kansans\u00e4velm\u00e4",
     "keys.prompt": "Mik\u00e4 s\u00e4vellaji?",
     "keys.progress": "S\u00e4vellaji {index} / {total}",
     "key.cf": "Ces",
@@ -240,8 +371,21 @@ const STRINGS = {
     "setup.title": "V\u00e4lj antal noter.",
     "setup.titleKeys": "V\u00e4lj antal tonarter.",
     "setup.played": "{label} \u2014 genomspelad",
-    "setup.melody": "Hymn till gl\u00e4djen",
-    "setup.melodyComposer": "Beethoven \u2014 spela hela melodin",
+    "setup.melodyHeading": "Eller spela en hel melodi",
+    "melody.mary-lamb": "Mary hade ett litet lamm",
+    "melody.mary-lamb.source": "Amerikansk folkmelodi",
+    "melody.jingle-bells": "Bj\u00e4llerklang",
+    "melody.jingle-bells.source": "Pierpont, 1857",
+    "melody.ode-to-joy": "Hymn till gl\u00e4djen",
+    "melody.ode-to-joy.source": "Beethoven, 1824",
+    "melody.ukko-nooa": "Gubben Noak",
+    "melody.ukko-nooa.source": "Svensk folkmelodi",
+    "melody.old-macdonald": "Per Olsson",
+    "melody.old-macdonald.source": "Engelsk folkmelodi",
+    "melody.twinkle": "Blinka lilla stj\u00e4rna",
+    "melody.twinkle.source": "Fransk folkmelodi",
+    "melody.frere-jacques": "Broder Jakob",
+    "melody.frere-jacques.source": "Fransk folkmelodi",
     "keys.prompt": "Vilken tonart?",
     "keys.progress": "Tonart {index} / {total}",
     "key.cf": "Cess",
@@ -581,10 +725,11 @@ function noteAtStep(clef, step) {
   return clef.notePool.find((note) => diatonicStep(note.key) === step);
 }
 
-// The tune placed in the clef being shown: the octave that puts it nearest the
+// A tune placed in the clef being shown: the octave that puts it nearest the
 // middle staff line, of those that fit inside the clef's pool. Returns the
-// notes paired with their lengths, or an empty list if no octave fits.
-function melodyNotes(clef) {
+// notes paired with their lengths — a rest keeps its length and carries a null
+// note — or an empty list if no octave fits.
+function melodyNotes(clef, melody) {
   const pool = clef.notePool;
   if (pool.length === 0) return [];
 
@@ -592,15 +737,18 @@ function melodyNotes(clef) {
   const poolLow = Math.min(...steps);
   const poolHigh = Math.max(...steps);
   const middle = diatonicStep(clef.middleLine);
-  const offsets = ODE_TO_JOY.map(([offset]) => offset);
+  // Rests have no pitch, so they place no demand on the clef's reach.
+  const offsets = melody.notes
+    .map(([offset]) => offset)
+    .filter((offset) => offset !== null);
   const lowest = Math.min(...offsets);
   const highest = Math.max(...offsets);
 
   let base = null;
-  // Whole octaves only, for the reason ODE_TO_JOY gives. The tune opens on the
-  // third of the scale, so the candidates are the Es the clef can reach.
+  // Whole octaves only, for the reason MELODIES gives, counted from the letter
+  // the tune opens on.
   for (let octave = 0; octave <= 9; octave++) {
-    const candidate = octave * 7 + LETTER_STEP.e;
+    const candidate = octave * 7 + LETTER_STEP[melody.opensOn];
     if (candidate + lowest < poolLow || candidate + highest > poolHigh) continue;
     if (base === null || Math.abs(candidate - middle) < Math.abs(base - middle)) {
       base = candidate;
@@ -608,25 +756,33 @@ function melodyNotes(clef) {
   }
   if (base === null) return [];
 
-  return ODE_TO_JOY.map(([offset, beats]) => ({
-    note: noteAtStep(clef, base + offset),
+  return melody.notes.map(([offset, beats]) => ({
+    note: offset === null ? null : noteAtStep(clef, base + offset),
     beats,
   }));
 }
 
+// The tunes this clef can hold, in the order MELODIES lists them. A clef whose
+// pool is too narrow for a tune simply does not offer it.
+function availableMelodies(clef) {
+  return MELODIES.filter((melody) => melodyNotes(clef, melody).length > 0);
+}
+
 // The reward for finishing: the whole tune, in time, from the beginning. Every
 // note is scheduled on the audio clock in one go rather than chased with
-// timers, so nothing drifts.
-function playMelody(notes) {
+// timers, so nothing drifts — a rest is silence that still takes its beats.
+function playMelody(entries) {
   let beat = 0;
-  for (const { note, beats } of notes) {
+  for (const { note, beats } of entries) {
     const seconds = beats * MELODY_BEAT_SECONDS;
-    playPianoNote(
-      note.key,
-      // A shade under its own length, so repeated notes are heard as two.
-      Math.max(0.3, seconds * 0.9),
-      MELODY_LEAD_IN_SECONDS + beat * MELODY_BEAT_SECONDS,
-    );
+    if (note) {
+      playPianoNote(
+        note.key,
+        // A shade under its own length, so repeated notes are heard as two.
+        Math.max(0.3, seconds * 0.9),
+        MELODY_LEAD_IN_SECONDS + beat * MELODY_BEAT_SECONDS,
+      );
+    }
     beat += beats;
   }
 }
@@ -829,8 +985,8 @@ function loadPlayed() {
 
   const played = {};
   for (const [mode, ids] of Object.entries(saved)) {
-    // A round is identified by its length, or by MELODY_ID for the tune, which
-    // has a length of its own and is not one of the presets.
+    // A round is identified by its length, or by a melody's id for the tunes,
+    // which have lengths of their own and are not among the presets.
     if (Array.isArray(ids)) {
       played[mode] = ids.filter(
         (id) => Number.isFinite(id) || typeof id === "string",
@@ -884,43 +1040,65 @@ function buildNoteCountOptions() {
     noteCountOptionsEl.appendChild(btn);
   }
 
-  buildMelodyOption();
+  buildMelodyOptions();
 }
 
-// A round of a fixed length, so it sits with the lengths rather than anywhere
-// else — but a tune rather than a number, so it gets a row of its own. Only
-// the note game has it: a melody is a run of notes to name, which is not a
-// question the key game asks.
-function buildMelodyOption() {
+// Rounds of a fixed length, so they sit with the lengths rather than anywhere
+// else — but tunes rather than numbers, so they get a list of their own under
+// them, behind a heading that says what they are. Only the note game has them:
+// a melody is a run of notes to name, which is not a question the key game
+// asks. A tune the current clef cannot hold is left out rather than shown
+// dead, so the list can come out empty and the heading goes with it.
+function buildMelodyOptions() {
   setupMelodyEl.replaceChildren();
-  if (gameMode !== "notes" || melodyNotes(currentClef).length === 0) return;
+  if (gameMode !== "notes") return;
 
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "melody-btn";
-  btn.id = "setup-melody-btn";
-  btn.classList.toggle("played", hasPlayed(gameMode, MELODY_ID));
+  const melodies = availableMelodies(currentClef);
+  if (melodies.length === 0) return;
 
-  const name = document.createElement("span");
-  name.className = "melody-name";
-  name.textContent = t("setup.melody");
+  const heading = document.createElement("h2");
+  heading.className = "setup-melody-title";
+  heading.id = "setup-melody-title";
+  heading.textContent = t("setup.melodyHeading");
 
-  const composer = document.createElement("span");
-  composer.className = "melody-composer";
-  composer.textContent = t("setup.melodyComposer");
+  const list = document.createElement("div");
+  list.className = "melody-list";
+  list.setAttribute("role", "group");
+  list.setAttribute("aria-labelledby", heading.id);
 
-  btn.append(name, composer);
+  for (const melody of melodies) {
+    const played = hasPlayed(gameMode, melody.id);
+    const title = t(`melody.${melody.id}`);
 
-  if (hasPlayed(gameMode, MELODY_ID)) {
-    const mark = document.createElement("span");
-    mark.className = "note-count-mark";
-    mark.textContent = "✓";
-    mark.setAttribute("aria-hidden", "true");
-    btn.appendChild(mark);
-    btn.setAttribute("aria-label", t("setup.played", { label: t("setup.melody") }));
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "melody-btn";
+    btn.dataset.melody = melody.id;
+    btn.classList.toggle("played", played);
+
+    const name = document.createElement("span");
+    name.className = "melody-name";
+    name.textContent = title;
+
+    const composer = document.createElement("span");
+    composer.className = "melody-composer";
+    composer.textContent = t(`melody.${melody.id}.source`);
+
+    btn.append(name, composer);
+
+    if (played) {
+      const mark = document.createElement("span");
+      mark.className = "note-count-mark";
+      mark.textContent = "✓";
+      mark.setAttribute("aria-hidden", "true");
+      btn.appendChild(mark);
+      btn.setAttribute("aria-label", t("setup.played", { label: title }));
+    }
+
+    list.appendChild(btn);
   }
 
-  setupMelodyEl.appendChild(btn);
+  setupMelodyEl.append(heading, list);
 }
 
 // The note range is edited on a staff of its own: the clef's whole pool drawn
@@ -2060,10 +2238,11 @@ function showCards(mode = "notes") {
   showScreen(cardsScreen);
 }
 
-// The notes of the tune when the round in progress is the melody, null when it
-// is a run of random ones. It is what tells the round apart afterwards — for
-// the replay on the results screen, for a restart on a clef change, and for
-// the playback that ends it.
+// Which tune the round in progress is, and its notes as placed in the current
+// clef, or null when the round is a run of random notes. It is what tells the
+// round apart afterwards — for the replay on the results screen, for a restart
+// on a clef change, for the playback that ends it, and for the tick the tune
+// earns rather than the length it happened to be.
 let melodyRound = null;
 
 function beginGame(questionCount) {
@@ -2079,15 +2258,24 @@ function beginGame(questionCount) {
   gameActive = true;
 }
 
-function beginMelody() {
-  const notes = melodyNotes(currentClef);
-  if (notes.length === 0) return;
+// Returns false when the tune is not one the current clef can hold, so a
+// caller re-placing a round in a new clef can fall back rather than leave the
+// round it was restarting half-started.
+function beginMelody(melodyId) {
+  const melody = findMelody(melodyId);
+  if (!melody) return false;
+  const entries = melodyNotes(currentClef, melody);
+  if (entries.length === 0) return false;
+  // A rest is not a question, so the round is only as long as the tune's
+  // sounding notes; the rests are kept in melodyRound for the playback.
+  const notes = entries.filter((entry) => entry.note).map((entry) => entry.note);
   gameMode = "notes";
-  melodyRound = notes;
+  melodyRound = { melody, entries };
   totalNotes = notes.length;
   showScreen(gameScreen);
-  startGame(notes.map((entry) => entry.note));
+  startGame(notes);
   gameActive = true;
+  return true;
 }
 
 // Starts the round in progress over: a clef change makes the notes on screen
@@ -2096,7 +2284,12 @@ function restartRound() {
   if (gameMode === "keys") {
     startKeysGame();
   } else if (melodyRound) {
-    beginMelody();
+    // A clef too narrow for the tune leaves it unplaceable; the round carries
+    // on as a run of that many random notes rather than stopping dead.
+    if (!beginMelody(melodyRound.melody.id)) {
+      melodyRound = null;
+      startGame();
+    }
   } else {
     startGame();
   }
@@ -2158,9 +2351,9 @@ function renderResults(accuracy) {
 
 function endGame() {
   gameActive = false;
-  markPlayed(gameMode, melodyRound ? MELODY_ID : totalNotes);
+  markPlayed(gameMode, melodyRound ? melodyRound.melody.id : totalNotes);
   // Every note of it has now been named; the reward is hearing what they were.
-  if (melodyRound) playMelody(melodyRound);
+  if (melodyRound) playMelody(melodyRound.entries);
 
   const total = correct + wrong;
   lastAccuracy = total > 0 ? Math.round((correct / total) * 100) : 0;
@@ -2176,9 +2369,9 @@ window.addEventListener("keydown", (event) => {
   // game the round that just ended belonged to.
   if (event.key === "Tab" && !resultsScreen.hidden) {
     event.preventDefault();
-    if (melodyRound) {
-      beginMelody();
-    } else {
+    // Same fallback as restartRound: a clef changed since the round ended may
+    // no longer hold the tune, and Tab should still start something.
+    if (!melodyRound || !beginMelody(melodyRound.melody.id)) {
       beginGame(totalNotes);
     }
     return;
@@ -2207,8 +2400,9 @@ noteCountOptionsEl.addEventListener("click", (event) => {
 });
 
 setupMelodyEl.addEventListener("click", (event) => {
-  if (!event.target.closest(".melody-btn")) return;
-  beginMelody();
+  const btn = event.target.closest("[data-melody]");
+  if (!btn) return;
+  beginMelody(btn.dataset.melody);
 });
 
 // Mouse and touch are served by the drag handlers, so what is left here is the
@@ -2474,6 +2668,9 @@ function applyClef(clefId) {
   buildRangeEditor();
   redrawCards();
   redrawCharts();
+  // Which tunes are on offer follows the clef too, and the picker may be the
+  // screen showing when the clef is changed from the dialog over it.
+  buildMelodyOptions();
   if (gameActive) {
     restartRound();
   } else {
