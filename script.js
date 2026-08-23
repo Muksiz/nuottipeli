@@ -678,10 +678,8 @@ const keysMistakesEl = document.getElementById("keys-mistakes");
 const keysStreakEl = document.getElementById("keys-streak");
 const noteChartScreen = document.getElementById("note-chart-screen");
 const noteChartRowsEl = document.getElementById("note-chart-rows");
-const noteChartClefEl = document.getElementById("note-chart-clef");
 const keyChartScreen = document.getElementById("key-chart-screen");
 const keyChartEl = document.getElementById("key-chart");
-const keyChartClefEl = document.getElementById("key-chart-clef");
 const cardsScreen = document.getElementById("cards-screen");
 const noteCardsEl = document.getElementById("note-cards");
 const cardsTitleEl = document.getElementById("cards-title");
@@ -1849,7 +1847,6 @@ function noteChartRowCount(width, count) {
 }
 
 function renderNoteChart() {
-  noteChartClefEl.textContent = t(`clef.${currentClef.id}`);
   noteChartRowsEl.replaceChildren();
 
   const pool = currentClef.notePool;
@@ -1954,7 +1951,6 @@ function widestKeySignature() {
 // of how many sharps they carry, then the flat ones. C major sits at the head
 // of the sharps, being nought of them, rather than being listed twice.
 function renderKeyChart() {
-  keyChartClefEl.textContent = t(`clef.${currentClef.id}`);
   keyChartEl.replaceChildren();
 
   const staveWidth = widestKeySignature();

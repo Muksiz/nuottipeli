@@ -1091,16 +1091,6 @@ body {
 /* Lookup pages rather than games: the clef's whole pool on one staff, and every
    key signature drawn in that clef. */
 
-/* Which clef the chart is showing. A chart read in the wrong clef is worse
-   than no chart, so it says so above the notation rather than nowhere. */
-.chart-clef {
-  margin: 0;
-  font-size: 0.85rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--status-label);
-}
-
 .chart-staff-wrap {
   width: 100%;
   min-width: 0;
