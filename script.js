@@ -1221,13 +1221,40 @@ langMenu.addEventListener("click", (e) => {
   applyLanguage(id);
 });
 
+// `chip` is the palette the picker's miniature staff is drawn in: the theme's
+// --notation-bg, --notation-border, --staff-color and --note-current. They are
+// repeated here because the chip is built in JS, while the palettes live in CSS
+// where only the theme in use can be read.
 const THEMES = [
-  { id: "parchment", color: "#f4ede4", group: "light" },
-  { id: "arctic", color: "#f7fafd", group: "light" },
-  { id: "espresso", color: "#271d14", group: "dark" },
-  { id: "midnight", color: "#1a2238", group: "dark" },
-  { id: "storm", color: "#3b4252", group: "dark" },
+  { id: "parchment", group: "light", chip: { bg: "#ece5da", border: "#d4cabb", line: "#6b5e50", note: "#b86a3e" } },
+  { id: "arctic", group: "light", chip: { bg: "#edf3f9", border: "#d0dce8", line: "#5a7a94", note: "#d45d5d" } },
+  { id: "espresso", group: "dark", chip: { bg: "#1d150e", border: "#3e3125", line: "#bca387", note: "#ec9a44" } },
+  { id: "midnight", group: "dark", chip: { bg: "#151d30", border: "#2a3654", line: "#8098c0", note: "#e0884a" } },
+  { id: "storm", group: "dark", chip: { bg: "#353b49", border: "#4c566a", line: "#a0aec0", note: "#bf616a" } },
 ];
+
+// A three-line staff carrying one note, in place of a plain colour dot: it
+// shows what the theme does to the notation rather than just its paper colour,
+// and it does not read as an empty radio button the way a circle did.
+function buildThemeChip({ bg, border, line, note }) {
+  const chip = document.createElement("span");
+  chip.className = "theme-chip";
+  chip.innerHTML = `
+    <svg viewBox="0 0 30 22" width="30" height="22" aria-hidden="true">
+      <rect x="0.5" y="0.5" width="29" height="21" rx="4.5"
+            fill="${bg}" stroke="${border}" />
+      <g stroke="${line}" stroke-width="0.9" opacity="0.7">
+        <line x1="5" y1="6.5" x2="25" y2="6.5" />
+        <line x1="5" y1="11" x2="25" y2="11" />
+        <line x1="5" y1="15.5" x2="25" y2="15.5" />
+      </g>
+      <ellipse cx="13" cy="13.2" rx="3" ry="2.3" fill="${note}"
+               transform="rotate(-20 13 13.2)" />
+      <line x1="15.9" y1="12.8" x2="15.9" y2="5.5" stroke="${note}"
+            stroke-width="1.1" stroke-linecap="round" />
+    </svg>`;
+  return chip;
+}
 
 const themeMenu = document.getElementById("theme-menu");
 
@@ -1252,14 +1279,11 @@ function buildThemeMenu() {
     for (const theme of THEMES.filter((entry) => entry.group === groupId)) {
       const btn = document.createElement("button");
       btn.className = "theme-menu-item";
-      btn.dataset.theme = theme.id;
+      btn.dataset.themeId = theme.id;
       btn.setAttribute("role", "option");
       btn.classList.toggle("active", theme.id === activeId);
 
-      const swatch = document.createElement("span");
-      swatch.className = "swatch";
-      swatch.style.background = theme.color;
-      btn.appendChild(swatch);
+      btn.appendChild(buildThemeChip(theme.chip));
 
       btn.appendChild(document.createTextNode(t(`theme.${theme.id}`)));
       section.appendChild(btn);
@@ -1272,7 +1296,7 @@ function applyTheme(themeId) {
   const theme = THEMES.find((entry) => entry.id === themeId) || THEMES[0];
   document.documentElement.setAttribute("data-theme", theme.id);
   themeMenu.querySelectorAll(".theme-menu-item").forEach((btn) => {
-    btn.classList.toggle("active", btn.dataset.theme === theme.id);
+    btn.classList.toggle("active", btn.dataset.themeId === theme.id);
   });
   renderNotation();
   // Note colors are read from CSS at draw time, so the picker staves have to be
@@ -1302,9 +1326,9 @@ if (migratedTheme !== savedTheme) localStorage.setItem("theme", initialTheme);
 applyTheme(initialTheme);
 
 themeMenu.addEventListener("click", (e) => {
-  const btn = e.target.closest("[data-theme]");
+  const btn = e.target.closest("[data-theme-id]");
   if (!btn) return;
-  const id = btn.dataset.theme;
+  const id = btn.dataset.themeId;
   localStorage.setItem("theme", id);
   applyTheme(id);
 });

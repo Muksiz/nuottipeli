@@ -1,7 +1,7 @@
 @import url("https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;500;600&display=swap");
 
 :root,
-[data-theme="parchment"] {
+:root[data-theme="parchment"] {
   --bg: #2a2520;
   --bg-grad-1: rgba(168, 120, 72, 0.12);
   --bg-grad-2: rgba(122, 158, 126, 0.08);
@@ -25,7 +25,7 @@
   --toggle-text: #6b5e50;
 }
 
-[data-theme="arctic"] {
+:root[data-theme="arctic"] {
   --bg: #e8eef4;
   --bg-grad-1: rgba(100, 160, 220, 0.1);
   --bg-grad-2: rgba(140, 180, 220, 0.08);
@@ -49,7 +49,7 @@
   --toggle-text: #5a7a94;
 }
 
-[data-theme="espresso"] {
+:root[data-theme="espresso"] {
   --bg: #15100b;
   --bg-grad-1: rgba(205, 142, 78, 0.1);
   --bg-grad-2: rgba(130, 158, 120, 0.05);
@@ -73,7 +73,7 @@
   --toggle-text: #bca387;
 }
 
-[data-theme="midnight"] {
+:root[data-theme="midnight"] {
   --bg: #0f1524;
   --bg-grad-1: rgba(60, 100, 200, 0.08);
   --bg-grad-2: rgba(100, 60, 180, 0.05);
@@ -97,7 +97,7 @@
   --toggle-text: #7088b0;
 }
 
-[data-theme="storm"] {
+:root[data-theme="storm"] {
   --bg: #2e3440;
   --bg-grad-1: rgba(136, 192, 208, 0.06);
   --bg-grad-2: rgba(163, 190, 140, 0.04);
@@ -179,9 +179,9 @@ body {
   --blob-blend: multiply;
 }
 
-[data-theme="espresso"],
-[data-theme="midnight"],
-[data-theme="storm"] {
+:root[data-theme="espresso"],
+:root[data-theme="midnight"],
+:root[data-theme="storm"] {
   --blob-blend: screen;
 }
 
@@ -471,17 +471,15 @@ body {
   display: block;
 }
 
+/* The light/dark grouping is a property of the themes on offer, not of the
+   theme in use, so the two boxes follow the active palette like every other
+   panel; only the headings say which group is which. */
 .theme-menu-section {
   border-radius: 8px;
   padding: 4px;
-}
-
-.theme-menu-section[data-group="light"] {
-  background: #f0ebe4;
-}
-
-.theme-menu-section[data-group="dark"] {
-  background: #2c2c34;
+  background: var(--notation-bg);
+  border: 1px solid var(--notation-border);
+  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .theme-menu-section + .theme-menu-section {
@@ -494,14 +492,7 @@ body {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-}
-
-.theme-menu-section[data-group="light"] .theme-menu-group {
-  color: #8a7e70;
-}
-
-.theme-menu-section[data-group="dark"] .theme-menu-group {
-  color: #9a96a0;
+  color: var(--status-label);
 }
 
 .theme-menu-item {
@@ -516,55 +507,28 @@ body {
   cursor: pointer;
   font-family: inherit;
   font-size: 0.82rem;
+  color: var(--text);
   transition: background 0.15s ease;
 }
 
-.theme-menu-section[data-group="light"] .theme-menu-item {
-  color: #3a3530;
-}
-
-.theme-menu-section[data-group="dark"] .theme-menu-item {
-  color: #e0ddd8;
-}
-
-.theme-menu-section[data-group="light"] .theme-menu-item:hover {
-  background: #e6ddd1;
-}
-
-.theme-menu-section[data-group="dark"] .theme-menu-item:hover {
-  background: #3a3a44;
+.theme-menu-item:hover,
+.theme-menu-item.active {
+  background: var(--status-bg);
 }
 
 .theme-menu-item.active {
   font-weight: 600;
 }
 
-.theme-menu-section[data-group="light"] .theme-menu-item.active {
-  background: #ddd5c8;
-}
-
-.theme-menu-section[data-group="dark"] .theme-menu-item.active {
-  background: #40404a;
-}
-
-.theme-menu-item .swatch {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
+.theme-menu-item .theme-chip {
+  display: block;
   flex-shrink: 0;
-}
-
-.theme-menu-section[data-group="light"] .theme-menu-item .swatch {
-  border: 1.5px solid #c8bfb0;
-}
-
-.theme-menu-section[data-group="dark"] .theme-menu-item .swatch {
-  border: 1.5px solid #555560;
+  line-height: 0;
 }
 
 /* The clef and language menus are short flat lists, so they skip the theme
-   menu's light/dark grouping and simply follow the active theme's colors.
-   They share every rule below; only the leading glyph differs. */
+   menu's grouped boxes. They share every rule below; only the leading glyph
+   differs. */
 .clef-menu,
 .lang-menu {
   display: block;
