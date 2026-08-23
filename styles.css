@@ -335,9 +335,6 @@ body {
 .toolbar {
   display: flex;
   align-items: center;
-  /* Back on the left, settings on the right. With the back button hidden the
-     lone gear still sits right, which is where it has always been. */
-  justify-content: space-between;
   gap: 8px;
   margin-bottom: 8px;
 }
@@ -380,6 +377,10 @@ body {
    single gear button instead of taking up screen room for the whole game. */
 .app-settings {
   position: relative;
+  /* Pushed right by a margin rather than by the toolbar's justification: the
+     back button is hidden on the menu screen, and a lone flex child would sit
+     left there — the gear belongs in the same corner on every screen. */
+  margin-left: auto;
 }
 
 .app-settings-toggle {
@@ -462,7 +463,9 @@ body {
 }
 
 /* Kept in view while the dialog scrolls: the note-range rows below make it
-   tall enough that a footer would need scrolling to reach. */
+   tall enough that a footer would need scrolling to reach. It stands in for the
+   toolbar's back button, which the dialog covers, so it sits where that button
+   is rather than opposite it. */
 .app-settings-bar {
   position: sticky;
   top: 0;
@@ -472,7 +475,7 @@ body {
   padding: 14px 18px;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   background: var(--card-bg);
   border-radius: 14px 14px 0 0;
   transition: background 0.2s ease;
@@ -490,14 +493,20 @@ body {
   width: 100%;
 }
 
+/* Shaped like the back button it stands in for, arrow and all. */
 .app-settings-done {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
   font-family: inherit;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
+  font-weight: 500;
   background: var(--toggle-bg);
   border: 1px solid var(--toggle-border);
   border-radius: 8px;
   color: var(--toggle-text);
-  padding: 8px 22px;
   cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease;
 }
@@ -505,6 +514,10 @@ body {
 .app-settings-done:hover {
   color: var(--note-current);
   border-color: var(--note-current);
+}
+
+.app-settings-done:active {
+  transform: translateY(1px);
 }
 
 .theme-menu {
