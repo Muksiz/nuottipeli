@@ -138,7 +138,7 @@ const STRINGS = {
     "theme.arctic": "Arktinen",
     "theme.espresso": "Espresso",
     "theme.midnight": "Y\u00f6",
-    "theme.nord": "Nord",
+    "theme.storm": "Myrsky",
   },
   sv: {
     "app.title": "Notl\u00e4sning",
@@ -176,7 +176,7 @@ const STRINGS = {
     "theme.arctic": "Arktisk",
     "theme.espresso": "Espresso",
     "theme.midnight": "Natt",
-    "theme.nord": "Nord",
+    "theme.storm": "Storm",
   },
 };
 
@@ -1226,7 +1226,7 @@ const THEMES = [
   { id: "arctic", color: "#f7fafd", group: "light" },
   { id: "espresso", color: "#271d14", group: "dark" },
   { id: "midnight", color: "#1a2238", group: "dark" },
-  { id: "nord", color: "#3b4252", group: "dark" },
+  { id: "storm", color: "#3b4252", group: "dark" },
 ];
 
 const themeMenu = document.getElementById("theme-menu");
@@ -1282,13 +1282,23 @@ function applyTheme(themeId) {
 
 buildThemeMenu();
 
+// Theme ids that are no longer in THEMES but may still be saved in someone's
+// browser: "dark" and "light" predate the named themes, and "storm" was called
+// "nord" while it still wore the name of the palette it was drawn from. The
+// resolved id is written back, so an entry here only has to survive until
+// everyone using it has opened the page once.
+const LEGACY_THEME_IDS = {
+  dark: "espresso",
+  light: "parchment",
+  nord: "storm",
+};
+
 const savedTheme = localStorage.getItem("theme");
-const initialTheme =
-  savedTheme === "dark"
-    ? "espresso"
-    : THEMES.find((entry) => entry.id === savedTheme)
-      ? savedTheme
-      : "parchment";
+const migratedTheme = LEGACY_THEME_IDS[savedTheme] ?? savedTheme;
+const initialTheme = THEMES.find((entry) => entry.id === migratedTheme)
+  ? migratedTheme
+  : "parchment";
+if (migratedTheme !== savedTheme) localStorage.setItem("theme", initialTheme);
 applyTheme(initialTheme);
 
 themeMenu.addEventListener("click", (e) => {

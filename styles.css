@@ -97,7 +97,7 @@
   --toggle-text: #7088b0;
 }
 
-[data-theme="nord"] {
+[data-theme="storm"] {
   --bg: #2e3440;
   --bg-grad-1: rgba(136, 192, 208, 0.06);
   --bg-grad-2: rgba(163, 190, 140, 0.04);
@@ -181,7 +181,7 @@ body {
 
 [data-theme="espresso"],
 [data-theme="midnight"],
-[data-theme="nord"] {
+[data-theme="storm"] {
   --blob-blend: screen;
 }
 
