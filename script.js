@@ -2344,6 +2344,11 @@ window.addEventListener("keydown", (event) => {
   // The settings dialog owns the keyboard while it is open, so a stray letter
   // there is not counted as an answer.
   if (!appSettingsMenu.hidden) return;
+  // A held key auto-repeats, and every repeat would be counted as another
+  // wrong answer — a leaned-on key could run the whole round out. Only the
+  // first press of a key answers; releasing it and pressing again is still as
+  // fast as the player can manage, which is not something to slow down.
+  if (event.repeat) return;
   // On the results screen, Tab quickly replays the same round — of whichever
   // game the round that just ended belonged to.
   if (event.key === "Tab" && !resultsScreen.hidden) {
