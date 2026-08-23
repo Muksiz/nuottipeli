@@ -263,11 +263,14 @@ const CLEFS = [
     glyph: "𝄢",
     // The middle (3rd) staff line of the bass clef is D3.
     middleLine: "d/3",
-    // Kept in range of the staff: from e/2 (one ledger line below) up through
-    // e/4 (two ledger lines above), passing middle C (c/4) on the first ledger
-    // line above. Leans slightly upward, where bass-clef reading actually
-    // lives, rather than diving into the rarely-read low ledger notes.
+    // Mirrors the treble and alto pools' geometry on the bass staff: 5 steps
+    // below the bottom line (G2) through 4 above the top line (A3), i.e. b/1 to
+    // e/4, centered on D3 with two ledger lines either side. Middle C (c/4)
+    // sits on the first ledger line above.
     notePool: [
+      { key: "b/1", name: "h" },
+      { key: "c/2", name: "c" },
+      { key: "d/2", name: "d" },
       { key: "e/2", name: "e" },
       { key: "f/2", name: "f" },
       { key: "g/2", name: "g" },
