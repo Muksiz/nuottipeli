@@ -1091,16 +1091,6 @@ body {
 /* Lookup pages rather than games: the clef's whole pool on one staff, and every
    key signature drawn in that clef. */
 
-/* Which clef the chart is showing. A chart read in the wrong clef is worse
-   than no chart, so it says so above the notation rather than nowhere. */
-.chart-clef {
-  margin: 0;
-  font-size: 0.85rem;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--status-label);
-}
-
 .chart-staff-wrap {
   width: 100%;
   min-width: 0;
@@ -1111,6 +1101,28 @@ body {
   background: var(--notation-bg);
   border: 1px solid var(--notation-border);
   transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+/* One row per staff. A narrow screen gets the pool over several of them —
+   eighteen notes across a phone leave a column each about as wide as a
+   notehead — so how many there are is decided in script.js, from the measured
+   width, and this only has to stack them. */
+.chart-staff-rows {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  gap: 4px;
+}
+
+.chart-staff-row {
+  min-width: 0;
+}
+
+/* The chart is a table, not a question: nothing on it is the note being asked
+   about, so the note names are ink like the noteheads above them rather than
+   wearing the accent colour that means "this one". */
+.chart-letters .range-letter.lit {
+  color: var(--text);
 }
 
 .key-chart {
