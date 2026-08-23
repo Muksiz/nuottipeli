@@ -630,55 +630,6 @@ body {
   justify-items: center;
 }
 
-.setup-label {
-  margin: 0;
-  font-size: 0.8rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--status-label);
-}
-
-.difficulty-options {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px;
-  width: 100%;
-}
-
-.difficulty-btn {
-  display: grid;
-  gap: 2px;
-  font-family: inherit;
-  background: var(--toggle-bg);
-  border: 1px solid var(--toggle-border);
-  color: var(--status-value);
-  padding: 12px 8px;
-  border-radius: 10px;
-  cursor: pointer;
-  transition: background 0.15s ease, transform 0.12s ease, border-color 0.15s ease, color 0.15s ease;
-}
-
-.difficulty-name {
-  font-family: "DM Serif Display", Georgia, serif;
-  font-size: 1.1rem;
-}
-
-.difficulty-btn:hover {
-  transform: translateY(-2px);
-  border-color: var(--note-current);
-}
-
-.difficulty-btn:active {
-  transform: translateY(0);
-}
-
-/* The chosen level stays highlighted: unlike the note-count buttons it does
-   not start the game, so it needs to read as a persistent selection. */
-.difficulty-btn.active {
-  border-color: var(--note-current);
-  color: var(--note-current);
-}
-
 /* --- Note range settings --- */
 
 .settings-panel {
@@ -699,26 +650,12 @@ body {
 
 .range-rows {
   display: grid;
-  gap: 14px;
   width: 100%;
   min-width: 0;
 }
 
-.range-row {
-  display: grid;
-  gap: 2px;
-  width: 100%;
-  min-width: 0;
-}
-
-.range-row-name {
-  font-family: "DM Serif Display", Georgia, serif;
-  font-size: 1rem;
-  color: var(--status-value);
-}
-
-/* The VexFlow staff fills the row; the band and the hit areas are absolutely
-   positioned over it, the hit areas one per note column. */
+/* The VexFlow staff fills the panel; the band, the ghost grip and the hit areas
+   are absolutely positioned over it, the hit areas one per note column. */
 .range-staff {
   position: relative;
   width: 100%;
@@ -747,10 +684,11 @@ body {
   transition: left 0.08s ease, width 0.08s ease;
 }
 
-/* A grip on each edge, so the band reads as something to take hold of. */
+/* A grip on each edge, so the band reads as something to take hold of. The
+   ghost below copies this shape, so keep the two in step. */
 .range-band::before,
-.range-band::after {
-  content: "";
+.range-band::after,
+.range-ghost {
   position: absolute;
   top: 50%;
   width: 6px;
@@ -760,12 +698,33 @@ body {
   background: var(--note-current);
 }
 
+.range-band::before,
+.range-band::after {
+  content: "";
+}
+
 .range-band::before {
   left: -4px;
 }
 
 .range-band::after {
   right: -4px;
+}
+
+/* Where the grip would come to rest if the press happened where the pointer is
+   — the same grip, dimmed. It says which end moves and where it stops, which a
+   highlight over the hovered column could not: at phone widths a column is a
+   few pixels wide, and the end that moves is often nowhere near it. Positioned
+   from script.js; left dark until there is somewhere to point at. */
+.range-ghost {
+  background: color-mix(in srgb, var(--note-current) 55%, transparent);
+  opacity: 0;
+  pointer-events: none;
+  transition: left 0.08s ease, opacity 0.12s ease;
+}
+
+.range-ghost.visible {
+  opacity: 1;
 }
 
 .range-hit {
@@ -778,18 +737,15 @@ body {
   background: transparent;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: background 0.12s ease;
 }
 
-.range-hit:hover,
+/* No fill of its own on hover or on a press: the ghost grip answers where the
+   range is going, and touch sees the band itself move on the way down. What is
+   left is the focus ring, which a keyboard still needs to follow its own
+   place on the staff. */
 .range-hit:focus-visible {
-  background: color-mix(in srgb, var(--note-current) 14%, transparent);
-  outline: none;
-}
-
-/* Touch has no hover, so the press itself has to say which note it landed on. */
-.range-hit:active {
-  background: color-mix(in srgb, var(--note-current) 22%, transparent);
+  outline: 2px solid color-mix(in srgb, var(--note-current) 55%, transparent);
+  outline-offset: -2px;
 }
 
 .settings-reset {
@@ -1017,8 +973,10 @@ body {
     transform: none;
   }
 
-  /* The band should still land where the finger is, just without easing. */
-  .range-band {
+  /* The band and its preview should still land where the finger is, just
+     without easing. */
+  .range-band,
+  .range-ghost {
     transition: none;
   }
 }
@@ -1040,10 +998,6 @@ body {
   .app-settings-cols {
     grid-template-columns: 1fr;
     gap: 12px;
-  }
-
-  .range-row-name {
-    font-size: 0.9rem;
   }
 }
 

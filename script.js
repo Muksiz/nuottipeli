@@ -110,11 +110,9 @@ const STRINGS = {
     "settings.language": "Kieli",
     "settings.clef": "Nuottiavain",
     "settings.theme": "Teema",
-    "settings.ranges": "Nuottialueet",
+    "settings.ranges": "Nuottialue",
     "settings.noNotes": "T\u00e4ll\u00e4 avaimella ei ole viel\u00e4 nuotteja.",
-    "setup.title": "Valitse vaikeustaso ja nuottien m\u00e4\u00e4r\u00e4.",
-    "setup.difficulty": "Vaikeustaso",
-    "setup.noteCount": "Nuottien m\u00e4\u00e4r\u00e4",
+    "setup.title": "Valitse nuottien m\u00e4\u00e4r\u00e4.",
     "game.correct": "Oikein",
     "game.wrong": "V\u00e4\u00e4rin",
     "game.streak": "Putki",
@@ -129,9 +127,6 @@ const STRINGS = {
     "clef.treble": "G-avain",
     "clef.alto": "C-avain",
     "clef.bass": "F-avain",
-    "difficulty.easy": "Helppo",
-    "difficulty.medium": "Keskitaso",
-    "difficulty.hard": "Vaikea",
     "theme.groupLight": "Vaalea",
     "theme.groupDark": "Tumma",
     "theme.parchment": "Pergamentti",
@@ -148,11 +143,9 @@ const STRINGS = {
     "settings.language": "Spr\u00e5k",
     "settings.clef": "Klav",
     "settings.theme": "Tema",
-    "settings.ranges": "Notomr\u00e5den",
+    "settings.ranges": "Notomr\u00e5de",
     "settings.noNotes": "Den h\u00e4r klaven har inga noter \u00e4nnu.",
-    "setup.title": "V\u00e4lj sv\u00e5righetsgrad och antal noter.",
-    "setup.difficulty": "Sv\u00e5righetsgrad",
-    "setup.noteCount": "Antal noter",
+    "setup.title": "V\u00e4lj antal noter.",
     "game.correct": "R\u00e4tt",
     "game.wrong": "Fel",
     "game.streak": "I rad",
@@ -167,9 +160,6 @@ const STRINGS = {
     "clef.treble": "G-klav",
     "clef.alto": "C-klav",
     "clef.bass": "F-klav",
-    "difficulty.easy": "L\u00e4tt",
-    "difficulty.medium": "Medel",
-    "difficulty.hard": "Sv\u00e5r",
     "theme.groupLight": "Ljus",
     "theme.groupDark": "M\u00f6rk",
     "theme.parchment": "Pergament",
@@ -187,8 +177,8 @@ function findLanguage(langId) {
   );
 }
 
-// Resolved before anything is drawn: the clef, theme and difficulty labels are
-// all looked up through t() while their menus are built.
+// Resolved before anything is drawn: the clef and theme labels are all looked
+// up through t() while their menus are built.
 let currentLanguage = findLanguage(localStorage.getItem(LANG_STORAGE_KEY));
 
 // A missing key falls back to Finnish rather than blanking the UI, so a
@@ -292,69 +282,68 @@ const CLEFS = [
 
 let currentClef = CLEFS[0];
 
-// --- Difficulty ---
-// Difficulty only narrows *which* notes can appear: every level draws from the
-// active clef's pool, cropped to a band centered on the clef's middle staff
-// line. `spread` is that band's half-width in diatonic steps (see
-// diatonicStep). A staff spans 4 steps either side of its middle line, so
-// spread 4 keeps every note on the staff itself, 6 allows one ledger line
-// above and below, and `null` means the whole pool — ledger lines included.
-const DIFFICULTIES = [
-  { id: "easy", spread: 4 },
-  { id: "medium", spread: 6 },
-  { id: "hard", spread: null },
-];
-
-const DEFAULT_DIFFICULTY_ID = "medium";
-
-function findDifficulty(difficultyId) {
-  return (
-    DIFFICULTIES.find((d) => d.id === difficultyId) ??
-    DIFFICULTIES.find((d) => d.id === DEFAULT_DIFFICULTY_ID)
-  );
-}
-
-// Restored here rather than in the init block at the bottom of the file: the
-// theme and clef setup both render the staff on load, and those renders draw
-// from this pool. Resolving the saved level up front keeps the first notes
-// drawn consistent with the highlighted button, whatever runs first.
-let currentDifficulty = findDifficulty(localStorage.getItem("difficulty"));
-
 // --- Note ranges ---
-// `spread` above is only the *default*. The player can widen or narrow any
-// level from the setup screen, and those choices are stored per clef and per
-// level (a range that makes sense in the treble clef would be nonsense in the
-// bass one) under localStorage key "noteRanges", as
-// { "<clefId>:<difficultyId>": { low, high } } note keys.
+// Which notes can appear is the player's to set: the active clef's pool,
+// cropped to a range dragged out in the settings dialog. The choice is stored
+// per clef — a range that makes sense in the treble clef would be nonsense in
+// the bass one — under localStorage key "noteRanges", as
+// { "<clefId>": { low, high } } note keys.
 const RANGE_STORAGE_KEY = "noteRanges";
 
+// Ranges used to be kept per clef *and* per difficulty level, keyed
+// "<clefId>:<difficultyId>". With the levels gone each clef keeps one range:
+// the one saved for the level that used to be the default, or failing that
+// whichever level was saved. The migrated shape is written back, so this only
+// has to outlive the browsers still holding the old one.
+const LEGACY_RANGE_LEVEL = "medium";
+
+// Returns whether the entry was an old-shape one.
+function migrateRange(ranges, key, value) {
+  const [clefId, level] = key.split(":");
+  const legacy = level !== undefined;
+  if (!legacy || !(clefId in ranges) || level === LEGACY_RANGE_LEVEL) {
+    ranges[clefId] = value;
+  }
+  return legacy;
+}
+
 function loadRanges() {
+  let saved = null;
   try {
-    const saved = JSON.parse(localStorage.getItem(RANGE_STORAGE_KEY));
-    return saved && typeof saved === "object" ? saved : {};
+    saved = JSON.parse(localStorage.getItem(RANGE_STORAGE_KEY));
   } catch {
     // Corrupt or hand-edited storage shouldn't take the game down with it.
     return {};
   }
+  if (!saved || typeof saved !== "object") return {};
+
+  const ranges = {};
+  let migrated = false;
+  for (const [key, value] of Object.entries(saved)) {
+    if (!value || typeof value !== "object") continue;
+    if (migrateRange(ranges, key, value)) migrated = true;
+  }
+  if (migrated) localStorage.setItem(RANGE_STORAGE_KEY, JSON.stringify(ranges));
+  return ranges;
 }
 
 let noteRanges = loadRanges();
 
-function rangeKey(clefId, difficultyId) {
-  return `${clefId}:${difficultyId}`;
-}
+// Where a clef starts before the player touches it. A staff spans 4 diatonic
+// steps either side of its middle line (see diatonicStep), so a half-width of 6
+// reaches one ledger line above and below: a range worth reading, and a clear
+// place to drag out from.
+const DEFAULT_SPREAD = 6;
 
-// The level's built-in range: the clef's pool cropped to a band centered on the
-// middle staff line, expressed as its lowest and highest note. Pools are listed
-// low to high, so the band's ends are its first and last entries.
-function defaultRange(clef, difficulty) {
+// That default as a pair of notes: the clef's pool cropped to a band centered
+// on the middle staff line. Pools are listed low to high, so the band's ends
+// are its first and last entries.
+function defaultRange(clef) {
   const pool = clef.notePool;
   if (pool.length === 0) return null;
-  const { spread } = difficulty;
-  if (spread === null) return { low: pool[0].key, high: pool.at(-1).key };
   const middle = diatonicStep(clef.middleLine);
   const inBand = pool.filter(
-    (note) => Math.abs(diatonicStep(note.key) - middle) <= spread,
+    (note) => Math.abs(diatonicStep(note.key) - middle) <= DEFAULT_SPREAD,
   );
   // A clef whose pool sits entirely outside the band would leave nothing to
   // draw; fall back to the full pool rather than an empty staff.
@@ -362,12 +351,12 @@ function defaultRange(clef, difficulty) {
   return { low: band[0].key, high: band.at(-1).key };
 }
 
-// The range in force for a clef/level pair: the saved one when it still names
-// notes this clef has, otherwise the default. Reversed ends are swapped rather
-// than rejected, so an out-of-order pick still yields a playable range.
-function rangeFor(clef, difficulty) {
-  const fallback = defaultRange(clef, difficulty);
-  const saved = noteRanges[rangeKey(clef.id, difficulty.id)];
+// The range in force for a clef: the saved one when it still names notes this
+// clef has, otherwise the default. Reversed ends are swapped rather than
+// rejected, so an out-of-order pick still yields a playable range.
+function rangeFor(clef) {
+  const fallback = defaultRange(clef);
+  const saved = noteRanges[clef.id];
   if (!fallback || !saved) return fallback;
   const keys = clef.notePool.map((note) => note.key);
   if (!keys.includes(saved.low) || !keys.includes(saved.high)) return fallback;
@@ -376,12 +365,11 @@ function rangeFor(clef, difficulty) {
     : { low: saved.high, high: saved.low };
 }
 
-// The notes actually in play: the current clef's pool cropped to the range of
-// the current difficulty. Cropping (rather than listing a pool per clef per
-// difficulty) keeps a new clef working at every level as soon as its notePool
-// is filled in.
+// The notes actually in play: the current clef's pool cropped to its range.
+// Cropping (rather than listing a pool per clef per range) keeps a new clef
+// working as soon as its notePool is filled in.
 function activeNotePool() {
-  const range = rangeFor(currentClef, currentDifficulty);
+  const range = rangeFor(currentClef);
   if (!range) return currentClef.notePool;
   const low = diatonicStep(range.low);
   const high = diatonicStep(range.high);
@@ -409,7 +397,6 @@ const setupScreen = document.getElementById("setup-screen");
 const gameScreen = document.getElementById("game-screen");
 const resultsScreen = document.getElementById("results-screen");
 const noteCountOptionsEl = document.getElementById("note-count-options");
-const difficultyOptionsEl = document.getElementById("difficulty-options");
 const resultsStatsEl = document.getElementById("results-stats");
 const resultsFaceEl = document.getElementById("results-face");
 const appSettingsToggle = document.getElementById("app-settings-toggle");
@@ -612,30 +599,10 @@ function buildNoteCountOptions() {
   }
 }
 
-function buildDifficultyOptions() {
-  difficultyOptionsEl.replaceChildren();
-  for (const d of DIFFICULTIES) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "difficulty-btn";
-    btn.dataset.difficulty = d.id;
-    const active = d.id === currentDifficulty.id;
-    btn.classList.toggle("active", active);
-    btn.setAttribute("aria-pressed", String(active));
-
-    const label = document.createElement("span");
-    label.className = "difficulty-name";
-    label.textContent = t(`difficulty.${d.id}`);
-
-    btn.append(label);
-    difficultyOptionsEl.appendChild(btn);
-  }
-}
-
-// One row per level: the level's name above a staff showing the clef's whole
-// pool with the level's range highlighted. The staff is drawn by
-// renderRangeStaff once the row is in the document and has a width.
-function buildRangeRows() {
+// The note range is edited on a staff of its own: the clef's whole pool drawn
+// out, with the range highlighted and draggable. The staff is drawn by
+// renderRangeStaff once it is in the document and has a width.
+function buildRangeEditor() {
   rangeRowsEl.replaceChildren();
 
   if (currentClef.notePool.length === 0) {
@@ -646,24 +613,11 @@ function buildRangeRows() {
     return;
   }
 
-  for (const d of DIFFICULTIES) {
-    const row = document.createElement("div");
-    row.className = "range-row";
-    row.dataset.difficulty = d.id;
+  const staff = document.createElement("div");
+  staff.className = "range-staff";
+  rangeRowsEl.appendChild(staff);
 
-    const name = document.createElement("span");
-    name.className = "range-row-name";
-    name.textContent = t(`difficulty.${d.id}`);
-
-    const staff = document.createElement("div");
-    staff.className = "range-staff";
-    staff.dataset.difficulty = d.id;
-
-    row.append(name, staff);
-    rangeRowsEl.appendChild(row);
-  }
-
-  renderRangeStaves();
+  renderRangeStaff(staff);
 }
 
 // Draws every note of the pool on a staff of its own, in-range notes in the
@@ -677,8 +631,7 @@ function buildRangeRows() {
 // own choosing so the tail of a long pool cannot bunch up past the stave's
 // right edge the way an auto-justified voice does.
 function renderRangeStaff(staffEl) {
-  const difficulty = findDifficulty(staffEl.dataset.difficulty);
-  const range = rangeFor(currentClef, difficulty);
+  const range = rangeFor(currentClef);
   const pool = currentClef.notePool;
   if (!range || pool.length === 0) return;
 
@@ -686,7 +639,7 @@ function renderRangeStaff(staffEl) {
   // is worse than not drawing it: the over-wide SVG widens the grid track it
   // sits in, and the re-render when the dialog opens then measures that
   // inflated track instead of the dialog. Leave it until it has a width —
-  // setAppSettingsOpen draws the staves once the dialog is on screen.
+  // setAppSettingsOpen draws the staff once the dialog is on screen.
   const width = staffEl.clientWidth;
   if (width === 0) return;
 
@@ -777,6 +730,14 @@ function renderRangeStaff(staffEl) {
     range,
   );
   staffEl.appendChild(band);
+
+  // The preview grip: where the band's own grip would end up if the press
+  // landed where the pointer is. Hidden until something hovers or focuses the
+  // staff — see showRangeGhost.
+  const ghost = document.createElement("div");
+  ghost.className = "range-ghost";
+  staffEl.appendChild(ghost);
+
   // Kept for the drag, which repositions the band without redrawing the staff.
   staffEl.dataset.noteGap = String(gap);
 
@@ -789,7 +750,6 @@ function renderRangeStaff(staffEl) {
     const hit = document.createElement("button");
     hit.type = "button";
     hit.className = "range-hit";
-    hit.dataset.difficulty = difficulty.id;
     hit.dataset.key = note.key;
     hit.dataset.x = String(xs[i]);
     hit.style.left = `${left}px`;
@@ -798,16 +758,16 @@ function renderRangeStaff(staffEl) {
       "aria-pressed",
       String(steps[i] >= low && steps[i] <= high),
     );
-    hit.setAttribute(
-      "aria-label",
-      `${t(`difficulty.${difficulty.id}`)}: ${noteLabel(currentClef, note.key)}`,
-    );
+    hit.setAttribute("aria-label", noteLabel(currentClef, note.key));
     staffEl.appendChild(hit);
   });
 }
 
-function renderRangeStaves() {
-  rangeRowsEl.querySelectorAll(".range-staff").forEach(renderRangeStaff);
+// Redraws the staff wherever it is called from — a theme change, a resize, or
+// the dialog opening on staves that had no width to lay out in while hidden.
+function redrawRangeStaff() {
+  const staffEl = rangeRowsEl.querySelector(".range-staff");
+  if (staffEl) renderRangeStaff(staffEl);
 }
 
 // The band is drawn from the noteheads rather than from the column
@@ -817,9 +777,15 @@ function positionRangeBand(band, columns, gap, range) {
   const lowIdx = columns.findIndex((col) => col.key === range.low);
   const highIdx = columns.findIndex((col) => col.key === range.high);
   if (lowIdx < 0 || highIdx < 0) return;
-  const pad = Math.max(8, Math.min(16, gap / 2));
+  const pad = bandPad(gap);
   band.style.left = `${columns[lowIdx].x - pad}px`;
   band.style.width = `${columns[highIdx].x - columns[lowIdx].x + pad * 2}px`;
+}
+
+// How far past the outermost noteheads the band reaches. Shared with the ghost
+// grip, which has to land exactly where the real one would.
+function bandPad(gap) {
+  return Math.max(8, Math.min(16, gap / 2));
 }
 
 // Which end of the range a note grabs: the nearer one, so a note outside the
@@ -854,26 +820,22 @@ function rangeWithEdgeAt(range, edge, key) {
 // Saves a range and redraws the one staff it belongs to. An edit that changes
 // nothing is dropped here rather than at each call site: the click that
 // follows a tap re-applies the same edit, and redrawing for it would flicker.
-function commitRange(difficulty, range) {
-  const current = rangeFor(currentClef, difficulty);
+function commitRange(range) {
+  const current = rangeFor(currentClef);
   if (current && current.low === range.low && current.high === range.high) {
     return;
   }
-  noteRanges[rangeKey(currentClef.id, difficulty.id)] = { ...range };
+  noteRanges[currentClef.id] = { ...range };
   localStorage.setItem(RANGE_STORAGE_KEY, JSON.stringify(noteRanges));
-  const staffEl = rangeRowsEl.querySelector(
-    `.range-staff[data-difficulty="${difficulty.id}"]`,
-  );
-  if (staffEl) renderRangeStaff(staffEl);
+  redrawRangeStaff();
 }
 
 // The click path, which after the drag handlers below is left serving the
 // keyboard: Enter or Space on a focused note.
-function setRangeFromNote(difficultyId, key) {
-  const difficulty = findDifficulty(difficultyId);
-  const range = rangeFor(currentClef, difficulty);
+function setRangeFromNote(key) {
+  const range = rangeFor(currentClef);
   if (!range) return;
-  commitRange(difficulty, rangeWithEdgeAt(range, edgeNearest(range, key), key));
+  commitRange(rangeWithEdgeAt(range, edgeNearest(range, key), key));
 }
 
 // --- Dragging an end of the range ---
@@ -940,13 +902,16 @@ rangeRowsEl.addEventListener("pointerdown", (event) => {
   const columns = staffColumns(staffEl);
   if (columns.length === 0) return;
 
-  const difficulty = findDifficulty(staffEl.dataset.difficulty);
-  const range = rangeFor(currentClef, difficulty);
+  const range = rangeFor(currentClef);
   const band = staffEl.querySelector(".range-band");
   if (!range || !band) return;
 
   const key = columnKeyAt(columns, offsetXOf(staffEl, event));
   const edge = edgeNearest(range, key);
+
+  // The band itself now shows what the press did, so the preview of it steps
+  // out of the way.
+  hideRangeGhost();
 
   rangeDrag = {
     pointerId: event.pointerId,
@@ -954,7 +919,6 @@ rangeRowsEl.addEventListener("pointerdown", (event) => {
     band,
     columns,
     gap: Number(staffEl.dataset.noteGap) || 0,
-    difficulty,
     // Kept so a gesture the browser takes over can be put back.
     committed: range,
     range: rangeWithEdgeAt(range, edge, key),
@@ -988,9 +952,14 @@ window.addEventListener("pointermove", (event) => {
 
 window.addEventListener("pointerup", (event) => {
   if (!rangeDrag || event.pointerId !== rangeDrag.pointerId) return;
-  const { difficulty, range } = rangeDrag;
+  const { staffEl, range } = rangeDrag;
   endRangeDrag();
-  commitRange(difficulty, range);
+  commitRange(range);
+  // A mouse that is still resting on the staff would otherwise show no preview
+  // until it moved again, so put one back under it straight away.
+  if (event.pointerType !== "touch") {
+    showRangeGhost(staffEl, offsetXOf(staffEl, event));
+  }
 });
 
 window.addEventListener("pointercancel", (event) => {
@@ -1002,14 +971,68 @@ window.addEventListener("pointercancel", (event) => {
   positionRangeBand(band, columns, gap, committed);
 });
 
-function applyDifficulty(difficultyId) {
-  currentDifficulty = findDifficulty(difficultyId);
-  difficultyOptionsEl.querySelectorAll("[data-difficulty]").forEach((btn) => {
-    const active = btn.dataset.difficulty === currentDifficulty.id;
-    btn.classList.toggle("active", active);
-    btn.setAttribute("aria-pressed", String(active));
-  });
+// --- Previewing where a press would land ---
+// Highlighting the column under the pointer said almost nothing: a column is a
+// few pixels wide, and the answer the player wants is which end of the range
+// moves and where it comes to rest. So the preview is a dimmer copy of the
+// band's own grip, shown where that grip would be if the press happened here —
+// including the stop at the other end, which a hover over the far side reveals
+// before the press instead of after it.
+function ghostGripX(columns, gap, range, key) {
+  const edge = edgeNearest(range, key);
+  const moved = rangeWithEdgeAt(range, edge, key);
+  const column = columns.find(
+    (col) => col.key === (edge === "low" ? moved.low : moved.high),
+  );
+  if (!column) return null;
+  // Mirrors .range-band's grips, which straddle the band's edges by 1px.
+  const pad = bandPad(gap) + 1;
+  return edge === "low" ? column.x - pad : column.x + pad;
 }
+
+function showRangeGhost(staffEl, offsetX) {
+  const ghost = staffEl.querySelector(".range-ghost");
+  const range = rangeFor(currentClef);
+  if (!ghost || !range) return;
+
+  const columns = staffColumns(staffEl);
+  if (columns.length === 0) return;
+
+  const gap = Number(staffEl.dataset.noteGap) || 0;
+  const x = ghostGripX(columns, gap, range, columnKeyAt(columns, offsetX));
+  if (x === null) return;
+
+  // GRIP_WIDTH / 2: the x above is the grip's centre.
+  ghost.style.left = `${x - 3}px`;
+  ghost.classList.add("visible");
+}
+
+function hideRangeGhost() {
+  rangeRowsEl
+    .querySelectorAll(".range-ghost.visible")
+    .forEach((ghost) => ghost.classList.remove("visible"));
+}
+
+// Touch is left out: it has no hover, and a press there has already moved the
+// band by the time anything could be previewed.
+rangeRowsEl.addEventListener("pointermove", (event) => {
+  if (rangeDrag || event.pointerType === "touch") return;
+  const staffEl = event.target.closest(".range-staff");
+  hideRangeGhost();
+  if (staffEl) showRangeGhost(staffEl, offsetXOf(staffEl, event));
+});
+
+rangeRowsEl.addEventListener("pointerleave", hideRangeGhost);
+
+// The keyboard gets the same preview, moving from note to note as Tab does, so
+// Enter is never a guess about which end will follow.
+rangeRowsEl.addEventListener("focusin", (event) => {
+  const hit = event.target.closest(".range-hit");
+  hideRangeGhost();
+  if (hit) showRangeGhost(hit.closest(".range-staff"), Number(hit.dataset.x));
+});
+
+rangeRowsEl.addEventListener("focusout", hideRangeGhost);
 
 function buildNotePad() {
   if (!notePadEl) return;
@@ -1116,13 +1139,6 @@ noteCountOptionsEl.addEventListener("click", (event) => {
   beginGame(Number(btn.dataset.count));
 });
 
-difficultyOptionsEl.addEventListener("click", (event) => {
-  const btn = event.target.closest("[data-difficulty]");
-  if (!btn) return;
-  localStorage.setItem("difficulty", btn.dataset.difficulty);
-  applyDifficulty(btn.dataset.difficulty);
-});
-
 // Mouse and touch are served by the drag handlers, so what is left here is the
 // keyboard: Enter or Space on a focused note. A press has already applied
 // itself by the time the click it leaves behind arrives, and re-applying it
@@ -1134,17 +1150,15 @@ rangeRowsEl.addEventListener("click", (event) => {
   if (event.detail !== 0) return;
   const hit = event.target.closest(".range-hit");
   if (!hit) return;
-  setRangeFromNote(hit.dataset.difficulty, hit.dataset.key);
+  setRangeFromNote(hit.dataset.key);
 });
 
 settingsResetBtn.addEventListener("click", () => {
-  // Only this clef's levels are cleared: the panel edits one clef at a time,
-  // so resetting all of them would be a surprise.
-  for (const d of DIFFICULTIES) {
-    delete noteRanges[rangeKey(currentClef.id, d.id)];
-  }
+  // Only this clef's range is cleared: the panel edits one clef at a time, so
+  // resetting the others would be a surprise.
+  delete noteRanges[currentClef.id];
   localStorage.setItem(RANGE_STORAGE_KEY, JSON.stringify(noteRanges));
-  buildRangeRows();
+  buildRangeEditor();
 });
 
 playAgainBtn.addEventListener("click", showSetup);
@@ -1157,7 +1171,7 @@ notePadEl.addEventListener("click", (event) => {
 
 window.addEventListener("resize", () => {
   renderNotation();
-  if (!appSettingsMenu.hidden) renderRangeStaves();
+  if (!appSettingsMenu.hidden) redrawRangeStaff();
 });
 
 // --- Language picker (a section of the settings menu) ---
@@ -1209,8 +1223,7 @@ function applyLanguage(langId) {
   buildLangMenu();
   buildThemeMenu();
   buildClefMenu();
-  buildDifficultyOptions();
-  buildRangeRows();
+  buildRangeEditor();
   renderNotation();
   if (gameActive) updateStatus();
   if (!resultsScreen.hidden) renderResults(lastAccuracy);
@@ -1302,9 +1315,9 @@ function applyTheme(themeId) {
     btn.classList.toggle("active", btn.dataset.themeId === theme.id);
   });
   renderNotation();
-  // Note colors are read from CSS at draw time, so the picker staves have to be
+  // Note colors are read from CSS at draw time, so the range staff has to be
   // redrawn for the new palette.
-  if (!appSettingsMenu.hidden) renderRangeStaves();
+  if (!appSettingsMenu.hidden) redrawRangeStaff();
 }
 
 buildThemeMenu();
@@ -1365,9 +1378,9 @@ function applyClef(clefId) {
   });
   // A single staff can only carry one clef, so switching mid-game would mix
   // incompatible note positions — restart the round with the new clef instead.
-  // Ranges are per clef, so the panel has to be redrawn for the clef that is
+  // The range is per clef, so the panel has to be redrawn for the clef that is
   // now showing.
-  buildRangeRows();
+  buildRangeEditor();
   if (gameActive) {
     startGame();
   } else {
@@ -1385,7 +1398,7 @@ clefMenu.addEventListener("click", (e) => {
   if (!btn) return;
   const id = btn.dataset.clef;
   localStorage.setItem("clef", id);
-  // The dialog stays open — applyClef rebuilds the range rows below for the
+  // The dialog stays open — applyClef rebuilds the range staff below for the
   // clef that is now showing, and that is worth seeing.
   applyClef(id);
 });
@@ -1397,9 +1410,9 @@ function setAppSettingsOpen(open) {
   appSettingsMenu.hidden = !open;
   appSettingsBackdrop.hidden = !open;
   appSettingsToggle.setAttribute("aria-expanded", String(open));
-  // A hidden dialog has no width, so the range staves can only be laid out
-  // once it is on screen.
-  if (open) renderRangeStaves();
+  // A hidden dialog has no width, so the range staff can only be laid out once
+  // it is on screen.
+  if (open) redrawRangeStaff();
 }
 
 function closeAppSettings() {
@@ -1421,9 +1434,7 @@ document.addEventListener("keydown", (e) => {
 });
 
 buildNoteCountOptions();
-buildDifficultyOptions();
-buildRangeRows();
-applyDifficulty(currentDifficulty.id);
+buildRangeEditor();
 buildNotePad();
 // Last, so it can rebuild every menu above in the saved language.
 applyLanguage(currentLanguage.id);
