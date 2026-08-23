@@ -761,6 +761,32 @@ body {
   right: -4px;
 }
 
+/* The same grip again, dimmed, at the note the pointer is over: it shows which
+   end a press would take hold of and where that end would land, in the one
+   shape the band already speaks in. Its size and its overhang past the band's
+   edge are mirrored in script.js, which places it — keep the two in step.
+   Hidden by default and only ever displayed inside the hover query below: a
+   finger has nowhere to hover, and a preview lit by a tap would only be left
+   behind under it. */
+.range-ghost {
+  display: none;
+  position: absolute;
+  top: 50%;
+  width: 6px;
+  height: 34px;
+  margin-top: -17px;
+  border-radius: 3px;
+  background: var(--note-future);
+  pointer-events: none;
+  transition: left 0.08s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .range-ghost:not([hidden]) {
+    display: block;
+  }
+}
+
 /* The pool's note names under the staff, one centred on each notehead. They
    are what makes the range readable without naming the notes off the staff
    first — which is the skill the game is for, not a toll to pay in settings. */
@@ -800,9 +826,10 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* No fill of its own on hover or on a press: the band itself shows where the
-   range is going. What is left is the focus ring, which a keyboard still needs
-   to follow its own place on the staff. */
+/* No fill of its own on hover or on a press: the band shows where the range
+   is going and the ghost grip above shows where a press would take it, so a
+   lit column would be a third thing saying the same. What is left is the focus
+   ring, which a keyboard still needs to follow its own place on the staff. */
 .range-hit:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--note-current) 55%, transparent);
   outline-offset: -2px;
@@ -1509,6 +1536,7 @@ body {
   /* The band should still land where the finger is, just without easing. The
      cards still turn over — they simply arrive at the far side at once. */
   .range-band,
+  .range-ghost,
   .note-card-inner {
     transition: none;
   }
