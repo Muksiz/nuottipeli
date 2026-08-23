@@ -679,9 +679,15 @@ function renderRangeStaff(staffEl) {
   const pool = currentClef.notePool;
   if (!range || pool.length === 0) return;
 
-  staffEl.replaceChildren();
+  // A hidden dialog gives its staves no width. Drawing one at a made-up width
+  // is worse than not drawing it: the over-wide SVG widens the grid track it
+  // sits in, and the re-render when the dialog opens then measures that
+  // inflated track instead of the dialog. Leave it until it has a width —
+  // setAppSettingsOpen draws the staves once the dialog is on screen.
+  const width = staffEl.clientWidth;
+  if (width === 0) return;
 
-  const width = staffEl.clientWidth || 600;
+  staffEl.replaceChildren();
 
   // VexFlow's staff lines sit 10px apart, so one diatonic step is 5px.
   const STEP_PX = 5;
@@ -754,9 +760,25 @@ function renderRangeStaff(staffEl) {
     sn.draw();
   });
 
+  const xs = staveNotes.map((sn) => sn.getAbsoluteX());
+
+  // The band spanning the range. Drawn before the hit areas so their hover
+  // highlight still reads on top of it, and positioned before it is in the
+  // document so its first paint doesn't animate in from nowhere.
+  const band = document.createElement("div");
+  band.className = "range-band";
+  positionRangeBand(
+    band,
+    pool.map((note, i) => ({ key: note.key, x: xs[i] })),
+    gap,
+    range,
+  );
+  staffEl.appendChild(band);
+  // Kept for the drag, which repositions the band without redrawing the staff.
+  staffEl.dataset.noteGap = String(gap);
+
   // Column boundaries sit halfway between neighbouring noteheads, so every
   // pixel of the staff belongs to exactly one note.
-  const xs = staveNotes.map((sn) => sn.getAbsoluteX());
   pool.forEach((note, i) => {
     const left = i === 0 ? 0 : (xs[i - 1] + xs[i]) / 2;
     const right = i === pool.length - 1 ? width : (xs[i] + xs[i + 1]) / 2;
@@ -766,6 +788,7 @@ function renderRangeStaff(staffEl) {
     hit.className = "range-hit";
     hit.dataset.difficulty = difficulty.id;
     hit.dataset.key = note.key;
+    hit.dataset.x = String(xs[i]);
     hit.style.left = `${left}px`;
     hit.style.width = `${right - left}px`;
     hit.setAttribute(
@@ -784,26 +807,197 @@ function renderRangeStaves() {
   rangeRowsEl.querySelectorAll(".range-staff").forEach(renderRangeStaff);
 }
 
-// Clicking a note moves whichever end of the range is nearer to it: a note
-// outside the range pulls that end outward, one inside pushes it inward. The
-// range can shrink to a single note but never inverts.
+// The band is drawn from the noteheads rather than from the column
+// boundaries: a column at either end of the pool runs to the edge of the
+// staff, and a band that ran out under the clef would read as a mistake.
+function positionRangeBand(band, columns, gap, range) {
+  const lowIdx = columns.findIndex((col) => col.key === range.low);
+  const highIdx = columns.findIndex((col) => col.key === range.high);
+  if (lowIdx < 0 || highIdx < 0) return;
+  const pad = Math.max(8, Math.min(16, gap / 2));
+  band.style.left = `${columns[lowIdx].x - pad}px`;
+  band.style.width = `${columns[highIdx].x - columns[lowIdx].x + pad * 2}px`;
+}
+
+// Which end of the range a note grabs: the nearer one, so a note outside the
+// range pulls that end outward and one inside pushes it inward. A range
+// collapsed onto a single note has no nearer end — there the note itself
+// decides which way the range opens.
+function edgeNearest(range, key) {
+  const step = diatonicStep(key);
+  const low = diatonicStep(range.low);
+  const high = diatonicStep(range.high);
+  if (low === high) return step >= low ? "high" : "low";
+  return Math.abs(step - low) <= Math.abs(step - high) ? "low" : "high";
+}
+
+// The range with one end moved to a note. The moved end stops at the other
+// rather than crossing it, so the range can shrink to a single note but never
+// inverts.
+function rangeWithEdgeAt(range, edge, key) {
+  const step = diatonicStep(key);
+  if (edge === "low") {
+    return {
+      low: step > diatonicStep(range.high) ? range.high : key,
+      high: range.high,
+    };
+  }
+  return {
+    low: range.low,
+    high: step < diatonicStep(range.low) ? range.low : key,
+  };
+}
+
+// Saves a range and redraws the one staff it belongs to. An edit that changes
+// nothing is dropped here rather than at each call site: the click that
+// follows a tap re-applies the same edit, and redrawing for it would flicker.
+function commitRange(difficulty, range) {
+  const current = rangeFor(currentClef, difficulty);
+  if (current && current.low === range.low && current.high === range.high) {
+    return;
+  }
+  noteRanges[rangeKey(currentClef.id, difficulty.id)] = { ...range };
+  localStorage.setItem(RANGE_STORAGE_KEY, JSON.stringify(noteRanges));
+  const staffEl = rangeRowsEl.querySelector(
+    `.range-staff[data-difficulty="${difficulty.id}"]`,
+  );
+  if (staffEl) renderRangeStaff(staffEl);
+}
+
+// The click path, which after the drag handlers below is left serving the
+// keyboard: Enter or Space on a focused note.
 function setRangeFromNote(difficultyId, key) {
   const difficulty = findDifficulty(difficultyId);
   const range = rangeFor(currentClef, difficulty);
-  const step = diatonicStep(key);
-  const distLow = Math.abs(step - diatonicStep(range.low));
-  const distHigh = Math.abs(step - diatonicStep(range.high));
-  const edge = distLow <= distHigh ? "low" : "high";
+  if (!range) return;
+  commitRange(difficulty, rangeWithEdgeAt(range, edgeNearest(range, key), key));
+}
 
-  const next = { ...range, [edge]: key };
-  if (diatonicStep(next.low) > diatonicStep(next.high)) {
-    next[edge === "low" ? "high" : "low"] = key;
+// --- Dragging an end of the range ---
+// At phone widths a note's column is only ~15px wide, far too small to aim a
+// finger at. So the whole staff is the control: a press anywhere grabs the
+// nearer end of the range, and sliding drags it from note to note while the
+// band tracks the finger — you steer by the band, not by hitting a column.
+// Only the band moves during the drag; the staff is redrawn once, on release.
+let rangeDrag = null;
+
+// How far a press has to travel sideways before it counts as a drag. Below
+// this it is still a tap, and a vertical swipe that started on a staff is left
+// to scroll the dialog (see touch-action: pan-y on .range-staff).
+const RANGE_DRAG_SLOP = 6;
+
+function staffColumns(staffEl) {
+  return [...staffEl.querySelectorAll(".range-hit")].map((hit) => ({
+    key: hit.dataset.key,
+    x: Number(hit.dataset.x),
+    left: hit.offsetLeft,
+    right: hit.offsetLeft + hit.offsetWidth,
+  }));
+}
+
+// The note under a point on the staff. A finger that has slid off either end
+// keeps dragging the outermost note rather than losing the drag.
+function columnKeyAt(columns, offsetX) {
+  const column = columns.find(
+    (col) => offsetX >= col.left && offsetX < col.right,
+  );
+  if (column) return column.key;
+  return offsetX < columns[0].left ? columns[0].key : columns.at(-1).key;
+}
+
+function offsetXOf(staffEl, event) {
+  return event.clientX - staffEl.getBoundingClientRect().left;
+}
+
+function drawDragBand() {
+  positionRangeBand(
+    rangeDrag.band,
+    rangeDrag.columns,
+    rangeDrag.gap,
+    rangeDrag.range,
+  );
+}
+
+function endRangeDrag() {
+  if (
+    rangeDrag.moved &&
+    rangeDrag.staffEl.hasPointerCapture(rangeDrag.pointerId)
+  ) {
+    rangeDrag.staffEl.releasePointerCapture(rangeDrag.pointerId);
+  }
+  rangeDrag = null;
+}
+
+rangeRowsEl.addEventListener("pointerdown", (event) => {
+  // Left button / primary touch only: a right-click shouldn't move the range.
+  if (event.button !== 0) return;
+  const staffEl = event.target.closest(".range-staff");
+  if (!staffEl) return;
+
+  const columns = staffColumns(staffEl);
+  if (columns.length === 0) return;
+
+  const difficulty = findDifficulty(staffEl.dataset.difficulty);
+  const range = rangeFor(currentClef, difficulty);
+  const band = staffEl.querySelector(".range-band");
+  if (!range || !band) return;
+
+  const key = columnKeyAt(columns, offsetXOf(staffEl, event));
+  const edge = edgeNearest(range, key);
+
+  rangeDrag = {
+    pointerId: event.pointerId,
+    staffEl,
+    band,
+    columns,
+    gap: Number(staffEl.dataset.noteGap) || 0,
+    difficulty,
+    // Kept so a gesture the browser takes over can be put back.
+    committed: range,
+    range: rangeWithEdgeAt(range, edge, key),
+    edge,
+    startX: event.clientX,
+    moved: false,
+  };
+  drawDragBand();
+});
+
+// On the window rather than the staff: the first move has to be seen before
+// the pointer is captured, and by then the finger may already be elsewhere.
+window.addEventListener("pointermove", (event) => {
+  if (!rangeDrag || event.pointerId !== rangeDrag.pointerId) return;
+
+  if (!rangeDrag.moved) {
+    if (Math.abs(event.clientX - rangeDrag.startX) < RANGE_DRAG_SLOP) return;
+    rangeDrag.moved = true;
+    // From here the drag owns the pointer, so it keeps tracking even when the
+    // finger wanders off the staff.
+    rangeDrag.staffEl.setPointerCapture(rangeDrag.pointerId);
   }
 
-  noteRanges[rangeKey(currentClef.id, difficulty.id)] = next;
-  localStorage.setItem(RANGE_STORAGE_KEY, JSON.stringify(noteRanges));
-  buildRangeRows();
-}
+  const key = columnKeyAt(
+    rangeDrag.columns,
+    offsetXOf(rangeDrag.staffEl, event),
+  );
+  rangeDrag.range = rangeWithEdgeAt(rangeDrag.range, rangeDrag.edge, key);
+  drawDragBand();
+});
+
+window.addEventListener("pointerup", (event) => {
+  if (!rangeDrag || event.pointerId !== rangeDrag.pointerId) return;
+  const { difficulty, range } = rangeDrag;
+  endRangeDrag();
+  commitRange(difficulty, range);
+});
+
+window.addEventListener("pointercancel", (event) => {
+  if (!rangeDrag || event.pointerId !== rangeDrag.pointerId) return;
+  // The browser took the gesture over to scroll: leave the range alone and put
+  // the band back where the saved one is.
+  const { band, columns, gap, committed } = rangeDrag;
+  endRangeDrag();
+  positionRangeBand(band, columns, gap, committed);
+});
 
 function applyDifficulty(difficultyId) {
   currentDifficulty = findDifficulty(difficultyId);
@@ -926,7 +1120,15 @@ difficultyOptionsEl.addEventListener("click", (event) => {
   applyDifficulty(btn.dataset.difficulty);
 });
 
+// Mouse and touch are served by the drag handlers, so what is left here is the
+// keyboard: Enter or Space on a focused note. A press has already applied
+// itself by the time the click it leaves behind arrives, and re-applying it
+// would not even be a no-op — where the press had to stop the dragged end at
+// the other one, the click would read the clamped range and move the far end
+// instead. detail is 0 only for a keyboard activation; every pointer-derived
+// click, tap included, counts at least one.
 rangeRowsEl.addEventListener("click", (event) => {
+  if (event.detail !== 0) return;
   const hit = event.target.closest(".range-hit");
   if (!hit) return;
   setRangeFromNote(hit.dataset.difficulty, hit.dataset.key);

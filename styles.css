@@ -400,6 +400,10 @@ body {
   max-height: calc(100vh - 24px);
   overflow-y: auto;
   display: grid;
+  /* minmax(0, …) rather than the default auto track: the note-range staves are
+     drawn to a pixel width, and an auto track would widen to fit one instead of
+     holding them to the dialog. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
   justify-items: center;
   background: var(--card-bg);
@@ -733,12 +737,14 @@ body {
   display: grid;
   gap: 14px;
   width: 100%;
+  min-width: 0;
 }
 
 .range-row {
   display: grid;
   gap: 2px;
   width: 100%;
+  min-width: 0;
 }
 
 .range-row-name {
@@ -747,12 +753,55 @@ body {
   color: var(--status-value);
 }
 
-/* The VexFlow staff fills the row; the hit areas are absolutely positioned
-   over it, one per note column. */
+/* The VexFlow staff fills the row; the band and the hit areas are absolutely
+   positioned over it, the hit areas one per note column. */
 .range-staff {
   position: relative;
   width: 100%;
   line-height: 0;
+  /* The whole staff is a drag surface, but only sideways: a vertical swipe
+     that starts here still scrolls the dialog, which is taller than a phone
+     screen. Dragging is handled in script.js. */
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* The range as a band across the staff. The in-range noteheads carry the
+   accent colour too, but at phone widths they are a few pixels wide — the band
+   is what actually shows where the range ends, and what the player drags. */
+.range-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--note-current) 10%, transparent);
+  border-left: 2px solid var(--note-current);
+  border-right: 2px solid var(--note-current);
+  /* Presses belong to the staff underneath, which handles the drag. */
+  pointer-events: none;
+  transition: left 0.08s ease, width 0.08s ease;
+}
+
+/* A grip on each edge, so the band reads as something to take hold of. */
+.range-band::before,
+.range-band::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 6px;
+  height: 34px;
+  margin-top: -17px;
+  border-radius: 3px;
+  background: var(--note-current);
+}
+
+.range-band::before {
+  left: -4px;
+}
+
+.range-band::after {
+  right: -4px;
 }
 
 .range-hit {
@@ -764,6 +813,7 @@ body {
   border-radius: 6px;
   background: transparent;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
   transition: background 0.12s ease;
 }
 
@@ -771,6 +821,11 @@ body {
 .range-hit:focus-visible {
   background: color-mix(in srgb, var(--note-current) 14%, transparent);
   outline: none;
+}
+
+/* Touch has no hover, so the press itself has to say which note it landed on. */
+.range-hit:active {
+  background: color-mix(in srgb, var(--note-current) 22%, transparent);
 }
 
 .settings-reset {
@@ -996,6 +1051,11 @@ body {
   .bg,
   .notes-layer {
     transform: none;
+  }
+
+  /* The band should still land where the finger is, just without easing. */
+  .range-band {
+    transition: none;
   }
 }
 
