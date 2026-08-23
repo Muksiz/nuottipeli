@@ -1160,6 +1160,13 @@ function staffGeometry(clef, steps) {
 // own length everywhere but the last row of a multi-row chart: a row holding
 // fewer notes than the ones above it should keep their spacing and stop early,
 // not spread three notes across the whole staff.
+// The stave's own inset from the element it is drawn in, and how far short of
+// the stave's right edge the last notehead's left edge stops. Together they say
+// how much room there is to the right of the last note — which is what the band
+// spreading into the gaps has to stay inside of.
+const STAVE_INSET = 2;
+const POOL_STAFF_TRAILING = 24;
+
 function drawPoolStaff(staffEl, pool, colorFor, columns = pool.length) {
   const width = staffEl.clientWidth;
   staffEl.replaceChildren();
@@ -1177,8 +1184,8 @@ function drawPoolStaff(staffEl, pool, colorFor, columns = pool.length) {
   context.setFillStyle(staffColor);
   context.setStrokeStyle(staffColor);
 
-  const staveX = 2;
-  const staveWidth = width - 4;
+  const staveX = STAVE_INSET;
+  const staveWidth = width - STAVE_INSET * 2;
   const stave = new Stave(staveX, staveY, staveWidth);
   stave.addClef(currentClef.id);
   stave.setDefaultLedgerLineStyle({
@@ -1210,7 +1217,10 @@ function drawPoolStaff(staffEl, pool, colorFor, columns = pool.length) {
   // Insets keep the first and last noteheads — and their ledger lines — clear
   // of the clef and of the stave's right edge.
   const first = 10;
-  const last = Math.max(first, staveX + staveWidth - 24 - baseX);
+  const last = Math.max(
+    first,
+    staveX + staveWidth - POOL_STAFF_TRAILING - baseX,
+  );
   const gap = columns > 1 ? (last - first) / (columns - 1) : 0;
 
   staveNotes.forEach((sn, i) => {
@@ -1329,6 +1339,12 @@ function renderRangeStaff(staffEl) {
 // size the staff is drawn, which puts its middle here.
 const NOTEHEAD_HALF_WIDTH = 8.5;
 
+// The middle of the head drawn at a column's x, which is what everything laid
+// over the staff — the letters, the band's edges, the ghost — is placed from.
+function noteCentreX(x) {
+  return x + NOTEHEAD_HALF_WIDTH;
+}
+
 function renderNoteLetters(lettersEl, pool, xs, isLit) {
   if (!lettersEl) return;
 
@@ -1339,7 +1355,7 @@ function renderNoteLetters(lettersEl, pool, xs, isLit) {
     const letter = document.createElement("span");
     letter.className = "range-letter";
     letter.classList.toggle("lit", isLit(i));
-    letter.style.left = `${xs[i] + NOTEHEAD_HALF_WIDTH}px`;
+    letter.style.left = `${noteCentreX(xs[i])}px`;
     letter.textContent = note.name.toUpperCase();
     lettersEl.appendChild(letter);
   });
@@ -1360,13 +1376,21 @@ function positionRangeBand(band, columns, gap, range) {
   const highIdx = columns.findIndex((col) => col.key === range.high);
   if (lowIdx < 0 || highIdx < 0) return;
   const pad = bandPad(gap);
-  band.style.left = `${columns[lowIdx].x - pad}px`;
+  band.style.left = `${noteCentreX(columns[lowIdx].x) - pad}px`;
   band.style.width = `${columns[highIdx].x - columns[lowIdx].x + pad * 2}px`;
 }
 
-// How far past the outermost noteheads the band reaches.
+// How far past the outermost noteheads' centres the band's edges reach: half
+// the gap, so an edge falls midway between the note it holds and the next one
+// along — the same line the hit columns divide on, and the reason both ends sit
+// the same distance from their note. The floor keeps the edge clear of the head
+// itself where the columns are drawn narrower than the heads standing in them,
+// which is every phone.
 function bandPad(gap) {
-  return Math.max(8, Math.min(16, gap / 2));
+  // Room to the right of the last notehead's centre: past that the band would
+  // hang off the staff, and the dialog would grow a sideways scrollbar for it.
+  const room = STAVE_INSET + POOL_STAFF_TRAILING - NOTEHEAD_HALF_WIDTH;
+  return Math.max(NOTEHEAD_HALF_WIDTH + 3, Math.min(gap / 2, room));
 }
 
 // Which end of the range a note grabs: the nearer one, so a note outside the
@@ -1557,21 +1581,22 @@ window.addEventListener("pointercancel", (event) => {
 // Mouse only. A finger has nowhere to hover, and the styles keep the preview
 // out of touch devices whatever this code does.
 
-// Mirrored from .range-ghost in styles.css: the grip is 6px wide and hangs
-// 4px past the band edge it belongs to, which is what makes the ghost land on
-// the same pixels as the grip it stands in for.
-const RANGE_GRIP_WIDTH = 6;
-const RANGE_GRIP_OVERHANG = 4;
+// Mirrored from .range-ghost in styles.css: the ghost is as wide as the band's
+// corner radius, since that is the room its curve needs, and carries its border
+// down one side only. Lining that side up with where the band's edge would be
+// is what makes the ghost land on the same pixels as the edge it stands in for.
+const RANGE_GHOST_WIDTH = 10;
 
 // Where the pointer last was, as an offset into the staff. Null whenever there
 // is nothing hovering it — which is also what a redraw reads to decide whether
 // to put a preview back.
 let rangeHoverX = null;
 
-// Where the ghost belongs, or null when there is nothing to show: no pointer
-// on the staff, a drag already under way — the band is the thing to watch by
-// then — or a press that would leave the range exactly as it is.
-function ghostLeft(staffEl) {
+// Which end the ghost stands for and where it belongs, or null when there is
+// nothing to show: no pointer on the staff, a drag already under way — the band
+// is the thing to watch by then — or a press that would leave the range exactly
+// as it is.
+function ghostPlacement(staffEl) {
   if (rangeDrag || rangeHoverX === null) return null;
 
   const range = rangeFor(currentClef);
@@ -1586,21 +1611,25 @@ function ghostLeft(staffEl) {
   const column = columns.find((col) => col.key === moved[edge]);
   if (!column) return null;
 
-  // The band reaches bandPad past its outermost noteheads and each grip hangs
-  // over that edge from outside, so the low one sits left of the band's left
-  // edge and the high one right of its right edge.
+  // The band's edge sits bandPad from the notehead's centre. The ghost's
+  // bordered side goes where that edge would be: for the low end its left side,
+  // so the box starts there; for the high end its right side, so it ends there.
   const pad = bandPad(Number(staffEl.dataset.noteGap) || 0);
-  return edge === "low"
-    ? column.x - pad - RANGE_GRIP_OVERHANG
-    : column.x + pad + RANGE_GRIP_OVERHANG - RANGE_GRIP_WIDTH;
+  const centre = noteCentreX(column.x);
+  const left =
+    edge === "low" ? centre - pad : centre + pad - RANGE_GHOST_WIDTH;
+  return { edge, left };
 }
 
 function updateRangeGhost(staffEl) {
   const ghost = staffEl.querySelector(".range-ghost");
   if (!ghost) return;
-  const left = ghostLeft(staffEl);
-  if (left !== null) ghost.style.left = `${left}px`;
-  ghost.hidden = left === null;
+  const placement = ghostPlacement(staffEl);
+  if (placement) {
+    ghost.dataset.edge = placement.edge;
+    ghost.style.left = `${placement.left}px`;
+  }
+  ghost.hidden = placement === null;
 }
 
 // Forgets the pointer and takes the preview down with it: on the way out of
@@ -1701,7 +1730,10 @@ function renderCardStaff(faceEl, note, geometry) {
   // the range staff keeps clear at either end.
   const baseX = staveNote.getAbsoluteX();
   const first = 10;
-  const last = Math.max(first, staveX + staveWidth - 24 - baseX);
+  const last = Math.max(
+    first,
+    staveX + staveWidth - POOL_STAFF_TRAILING - baseX,
+  );
   staveNote.getTickContext().setX((first + last) / 2);
   staveNote.draw();
 

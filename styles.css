@@ -761,15 +761,42 @@ body {
   right: -4px;
 }
 
-/* The same grip again, dimmed, at the note the pointer is over: it shows which
-   end a press would take hold of and where that end would land, in the one
-   shape the band already speaks in. Its size and its overhang past the band's
-   edge are mirrored in script.js, which places it — keep the two in step.
+/* The band's whole edge again, dimmed, at the note the pointer is over: it
+   shows which end a press would take hold of and where that end would land, in
+   the one shape the band already speaks in — the line up the full height of the
+   staff, the curve away at either end, and the grip across the middle. It is
+   one end of a band rather than a band, so it carries a border down one side
+   only and the radius on that side's two corners; the width is that radius, the
+   room the curve needs, and is mirrored in script.js, which lines the ghost's
+   bordered side up with where the band's edge would be — keep the two in step.
    Hidden by default and only ever displayed inside the hover query below: a
    finger has nowhere to hover, and a preview lit by a tap would only be left
    behind under it. */
 .range-ghost {
   display: none;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 10px;
+  pointer-events: none;
+  transition: left 0.08s ease;
+}
+
+.range-ghost[data-edge="low"] {
+  border-left: 2px solid var(--note-future);
+  border-top-left-radius: 10px;
+  border-bottom-left-radius: 10px;
+}
+
+.range-ghost[data-edge="high"] {
+  border-right: 2px solid var(--note-future);
+  border-top-right-radius: 10px;
+  border-bottom-right-radius: 10px;
+}
+
+/* The grip, hung off the bordered side exactly as the band hangs its own. */
+.range-ghost::after {
+  content: "";
   position: absolute;
   top: 50%;
   width: 6px;
@@ -777,8 +804,14 @@ body {
   margin-top: -17px;
   border-radius: 3px;
   background: var(--note-future);
-  pointer-events: none;
-  transition: left 0.08s ease;
+}
+
+.range-ghost[data-edge="low"]::after {
+  left: -4px;
+}
+
+.range-ghost[data-edge="high"]::after {
+  right: -4px;
 }
 
 @media (hover: hover) and (pointer: fine) {
