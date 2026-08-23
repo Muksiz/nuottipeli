@@ -1216,9 +1216,32 @@ body {
   border-color: var(--note-current);
 }
 
-/* A round of a fixed length like the numbers above it, but a tune rather than a
-   number, so it gets a row of its own under them. */
+/* Rounds of a fixed length like the numbers above them, but tunes rather than
+   numbers, so they get a block of their own under them. */
 .setup-melody {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  margin-top: 6px;
+}
+
+/* The one heading on the setup screen that is not the title, so it says what
+   the list under it is without competing with the question above it. */
+.setup-melody-title {
+  margin: 0;
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: 0.95rem;
+  font-weight: 400;
+  text-align: center;
+  color: var(--status-label);
+}
+
+/* The tunes are named, not numbered, so they need room to be read — as many
+   per row as fit a title, rather than a fixed count the way the numbers use. */
+.melody-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
   width: 100%;
 }
 
@@ -1226,6 +1249,7 @@ body {
   position: relative;
   display: grid;
   gap: 2px;
+  align-content: center;
   justify-items: center;
   width: 100%;
   font-family: inherit;
@@ -1260,12 +1284,17 @@ body {
 
 .melody-name {
   font-family: "DM Serif Display", Georgia, serif;
-  font-size: 1.15rem;
-  line-height: 1.1;
+  font-size: 1.05rem;
+  line-height: 1.15;
+  text-align: center;
+  /* Long titles wrap rather than widening their column: the buttons share a
+     grid, so one of them stretching would stretch the whole row. */
+  overflow-wrap: anywhere;
 }
 
 .melody-composer {
   font-size: 0.72rem;
+  text-align: center;
   color: var(--status-label);
 }
 
