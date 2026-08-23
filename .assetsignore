@@ -1,7 +1,0 @@
-**/.git
-**/.DS_Store
-**/node_modules
-**/.vite
-CLAUDE.md
-wrangler.jsonc
-.gitignore

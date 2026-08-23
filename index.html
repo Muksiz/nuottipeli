@@ -172,15 +172,12 @@
         <h1 class="screen-title" id="setup-title" data-i18n="setup.title">
           Valitse nuottien määrä.
         </h1>
-        <div class="setup-group">
-          <div
-            class="note-count-options"
-            id="note-count-options"
-            role="group"
-            aria-labelledby="setup-title"
-          ></div>
-          <div class="setup-melody" id="setup-melody"></div>
-        </div>
+        <div
+          class="note-count-options"
+          id="note-count-options"
+          role="group"
+          aria-labelledby="setup-title"
+        ></div>
       </section>
 
       <section class="screen cards-screen" id="cards-screen" hidden>
@@ -190,6 +187,34 @@
         <p class="screen-hint" data-i18n="cards.hint">
           Paina välilyöntiä tai napauta korttia. Kortti vaihtuu itsestään.
         </p>
+        <div
+          class="card-order"
+          id="card-order"
+          role="radiogroup"
+          aria-label="Korttien järjestys"
+          data-i18n-aria="cards.order"
+        >
+          <button
+            type="button"
+            class="card-order-btn"
+            data-order="deck"
+            role="radio"
+            aria-checked="true"
+            data-i18n="cards.inOrder"
+          >
+            Järjestyksessä
+          </button>
+          <button
+            type="button"
+            class="card-order-btn"
+            data-order="random"
+            role="radio"
+            aria-checked="false"
+            data-i18n="cards.random"
+          >
+            Satunnainen
+          </button>
+        </div>
         <div class="card-deck">
           <div
             class="note-card-slot"
