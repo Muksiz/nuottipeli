@@ -1379,6 +1379,15 @@ body {
   border-color: var(--note-current);
 }
 
+/* The right pick, lit for as long as the signature is held on screen — the
+   beat the two chords need to sound. Without it the pause would read as a
+   press that did nothing rather than as an answer being heard out. */
+.key-option.correct {
+  animation: correct-pop 400ms ease;
+  border-color: var(--note-current);
+  color: var(--note-current);
+}
+
 /* The eight interval names, in their own order and never in any other: the
    answer is a count, not one of four things it might be, so the pad stays put
    and 5 is always in the same place. Four across on every screen — eight in a
@@ -1554,6 +1563,7 @@ body {
   }
 
   .key-option.wrong,
+  .key-option.correct,
   .interval-option.wrong {
     animation: none;
   }
