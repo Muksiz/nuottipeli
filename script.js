@@ -1643,6 +1643,40 @@ function tintKeySignature(container, color) {
     });
 }
 
+// How long an answered signature stays on screen before the next question
+// replaces it. A right answer sounds two chords — the major, then the relative
+// minor TRIAD_GAP_SECONDS later — and the signature that earned them should
+// still be up while they are heard rather than being swapped out under the
+// first one. Measured off that gap so the two cannot drift apart: the front of
+// the second chord, plus enough of it to be heard as a chord.
+const KEY_REVEAL_HOLD_MS = (TRIAD_GAP_SECONDS + 0.9) * 1000;
+
+// The answer being held on screen, or null while a question is still open. It
+// keeps the round where it is — currentIndex does not move until the hold is
+// over — so the staff, the progress line and the lit answer all say the same
+// thing, and a redraw landing mid-hold draws the same question again.
+let keyHold = null;
+let keyHoldTimer = null;
+
+function clearKeyHold() {
+  if (keyHoldTimer !== null) clearTimeout(keyHoldTimer);
+  keyHoldTimer = null;
+  keyHold = null;
+}
+
+// The end of the hold, whether it was waited out or cut short. This is where
+// the round actually moves on.
+function finishKeyHold() {
+  clearKeyHold();
+  currentIndex += 1;
+  updateStatus();
+  if (currentIndex >= totalNotes) {
+    endGame();
+  } else {
+    renderKeysRound();
+  }
+}
+
 function renderKeyChoices() {
   const question = keyQuestions[currentIndex];
   keyOptionsEl.replaceChildren();
@@ -1653,6 +1687,10 @@ function renderKeyChoices() {
     btn.type = "button";
     btn.className = "key-option";
     btn.dataset.key = key.id;
+
+    // While the answer is being held on screen, the one that was right is lit,
+    // so the pause reads as an answer rather than as a press that did nothing.
+    if (keyHold && keyHold.key.id === key.id) btn.classList.add("correct");
 
     const name = document.createElement("span");
     name.className = "key-option-name";
@@ -1675,6 +1713,14 @@ function renderKeysRound() {
 function handleKeyGuess(keyId) {
   if (!gameActive || gameMode !== "keys") return;
 
+  // A press while the answer is up cuts the hold short and moves on, the same
+  // bargain the card deck's reveal timer makes: whoever has already heard it
+  // is never held up, and whoever has not can simply wait it out.
+  if (keyHold) {
+    finishKeyHold();
+    return;
+  }
+
   const question = keyQuestions[currentIndex];
   if (!question) return;
 
@@ -1682,14 +1728,13 @@ function handleKeyGuess(keyId) {
     playKeyTriads(question.key);
     correct += 1;
     streak += 1;
-    currentIndex += 1;
     triggerFeedback("correct", keysNotationEl);
     updateStatus();
-    if (currentIndex >= totalNotes) {
-      endGame();
-    } else {
-      renderKeysRound();
-    }
+    // The round moves on at the end of the hold, not here — the signature
+    // stays up until the chords it earned have sounded.
+    keyHold = { key: question.key };
+    renderKeyChoices();
+    keyHoldTimer = setTimeout(finishKeyHold, KEY_REVEAL_HOLD_MS);
   } else {
     playErrorTone();
     wrong += 1;
@@ -1706,6 +1751,7 @@ function handleKeyGuess(keyId) {
 }
 
 function startKeysGame() {
+  clearKeyHold();
   keyQuestions = [];
   currentIndex = 0;
   correct = 0;
@@ -2202,8 +2248,10 @@ window.addEventListener("keydown", (event) => {
 });
 
 function showScreen(screen) {
-  // Leaving the cards screen cancels an advance that has not fired yet.
+  // Leaving the cards screen cancels an advance that has not fired yet, and a
+  // held key signature stops waiting for a question nobody is looking at.
   clearCardAdvance();
+  clearKeyHold();
   // One way out, in the same place on every screen. The menu is the one screen
   // there is nothing behind, so it is the one screen without it.
   toolbarBack.hidden = screen === menuScreen;
