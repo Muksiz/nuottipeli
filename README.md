@@ -15,3 +15,5 @@ VexFlow is loaded from a CDN, so the first load needs a network connection.
 Pushes to `main` deploy to Cloudflare as a static-asset Worker; `wrangler.jsonc`
 serves the repo root and `.assetsignore` keeps everything that is not the site
 out of the upload.
+
+CI/CD test
