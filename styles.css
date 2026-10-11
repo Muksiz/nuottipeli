@@ -587,6 +587,14 @@ body {
   display: block;
 }
 
+/* The instrument list sits under the language list, which is the shortest of
+   the three columns, with a rule between them where a heading would be. */
+.instrument-menu {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--toggle-border);
+}
+
 .clef-menu-item,
 .lang-menu-item {
   display: flex;
@@ -1189,6 +1197,22 @@ body {
   background: var(--notation-bg);
 }
 
+/* The interval game's choice of intervals borrows the same pill on the
+   round-length picker. It sets a display of its own, so hiding it on the other
+   two games' pickers has to be spelled out; and its labels are long enough to
+   need a phone's whole width, so the two halves share it and wrap inside. */
+.interval-scale[hidden] {
+  display: none;
+}
+
+.interval-scale {
+  max-width: 100%;
+}
+
+.interval-scale .card-order-btn {
+  flex: 1 1 auto;
+}
+
 .card-order-btn {
   padding: 6px 14px;
   border: none;
@@ -1393,6 +1417,79 @@ body {
    and 5 is always in the same place. Four across on every screen — eight in a
    row would shrink the names past reading, two would run the pad down the
    page. */
+/* The other half of the answer in a round of all the intervals: which kind of
+   terssi, picked here and then committed with the number below. A pick stays
+   lit until the answer is given, so the two halves can be read off together. */
+.interval-qualities {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 10px;
+  width: 100%;
+}
+
+.interval-qualities[hidden] {
+  display: none;
+}
+
+.interval-quality {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 9px 4px;
+  background: var(--toggle-bg);
+  border: 1px solid var(--toggle-border);
+  border-radius: 12px;
+  color: var(--status-label);
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.interval-quality:hover,
+.interval-quality.active {
+  border-color: var(--note-current);
+  color: var(--note-current);
+}
+
+.interval-quality.active {
+  font-weight: 600;
+  background: var(--notation-bg);
+}
+
+.interval-quality:focus-visible {
+  outline: 2px solid var(--note-current);
+  outline-offset: 2px;
+}
+
+.interval-quality.wrong {
+  animation: wrong-shake 400ms ease;
+  border-color: var(--note-current);
+}
+
+/* A number pressed with no quality picked: the row it is waiting on moves and
+   lights up, and stays lit until something in it is chosen. */
+.interval-qualities.nudge {
+  animation: wrong-shake 400ms ease;
+}
+
+.interval-qualities.nudge .interval-quality {
+  border-color: var(--note-current);
+}
+
+/* Five across is too tight for "ylinouseva" on a phone: three and two. */
+@media (max-width: 560px) {
+  .interval-qualities {
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+  }
+
+  .interval-quality {
+    grid-column: span 2;
+  }
+
+  .interval-quality:nth-child(n + 4) {
+    grid-column: span 3;
+  }
+}
+
 .interval-options {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -1445,6 +1542,15 @@ body {
   font-size: 0.72rem;
   line-height: 1.2;
   color: var(--status-label);
+}
+
+/* "puhdas kvintti" is wider than a phone's column, and left to itself some
+   names would wrap and others not. Narrow, every quality takes a line of its
+   own so the eight boxes stay alike. */
+@media (max-width: 560px) {
+  .interval-option-quality {
+    display: block;
+  }
 }
 
 /* Rounds of a fixed length like the numbers above them, but tunes rather than
@@ -1564,7 +1670,9 @@ body {
 
   .key-option.wrong,
   .key-option.correct,
-  .interval-option.wrong {
+  .interval-option.wrong,
+  .interval-quality.wrong,
+  .interval-qualities.nudge {
     animation: none;
   }
 }

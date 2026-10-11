@@ -64,6 +64,13 @@
                   aria-label="Kieli"
                   data-i18n-aria="settings.language"
                 ></div>
+                <div
+                  class="lang-menu instrument-menu"
+                  id="instrument-menu"
+                  role="listbox"
+                  aria-label="Soitin"
+                  data-i18n-aria="settings.instrument"
+                ></div>
               </div>
               <div class="app-settings-group">
                 <div
@@ -186,6 +193,35 @@
         <h1 class="screen-title" id="setup-title" data-i18n="setup.title">
           Valitse nuottien määrä.
         </h1>
+        <div
+          class="card-order interval-scale"
+          id="interval-scale"
+          role="radiogroup"
+          aria-label="Intervallien valikoima"
+          data-i18n-aria="intervals.scale"
+          hidden
+        >
+          <button
+            type="button"
+            class="card-order-btn"
+            data-scale="major"
+            role="radio"
+            aria-checked="true"
+            data-i18n="intervals.scaleMajor"
+          >
+            Duuriasteikkoiset intervallit
+          </button>
+          <button
+            type="button"
+            class="card-order-btn"
+            data-scale="all"
+            role="radio"
+            aria-checked="false"
+            data-i18n="intervals.scaleAll"
+          >
+            Kaikki intervallit
+          </button>
+        </div>
         <div class="setup-group">
           <div
             class="note-count-options"
@@ -318,6 +354,14 @@
         <p class="game-prompt" id="intervals-prompt" data-i18n="intervals.prompt">
           Mikä intervalli?
         </p>
+        <div
+          class="interval-qualities"
+          id="interval-qualities"
+          role="radiogroup"
+          aria-label="Intervallin laatu"
+          data-i18n-aria="intervals.qualities"
+          hidden
+        ></div>
         <div
           class="interval-options"
           id="interval-options"

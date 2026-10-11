@@ -10,6 +10,15 @@ seven out-of-copyright melodies to read instead of a plain count of notes.
 There is no build step and no package manager. Open `index.html` in a browser.
 VexFlow is loaded from a CDN, so the first load needs a network connection.
 
+The instrument sounds are recordings fetched from `sounds/`, which a browser
+only allows over HTTP — opened straight off the disk the app still works, but
+plays a synthesised tone instead. `vite .` or any static file server will do.
+
+## Credits
+
+The piano, guitar and clarinet notes are from the FluidR3_GM soundfont by Frank
+Wen, licensed CC BY 3.0. See `sounds/README.md`.
+
 ## Deployment
 
 Pushes to `main` deploy to Cloudflare as a static-asset Worker; `wrangler.jsonc`

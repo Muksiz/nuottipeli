@@ -1,4 +1,13 @@
-const { Renderer, Stave, StaveNote, Voice, Formatter, TickContext } = Vex.Flow;
+const {
+  Renderer,
+  Stave,
+  StaveNote,
+  Voice,
+  Formatter,
+  TickContext,
+  Accidental,
+  ModifierContext,
+} = Vex.Flow;
 
 // --- Piano audio synthesis ---
 // Frequencies are derived from the note key (e.g. "c/4") in equal temperament
@@ -25,11 +34,145 @@ function getAudioContext() {
   return audioCtx;
 }
 
-// One struck string. `delay` schedules it that many seconds ahead on the audio
-// clock rather than on a timer, so the notes of a chord sound together; `gain`
-// is turned down for those, since three of them play at once.
+// --- Instruments ---
+// What the notes are played on, picked in the settings and kept under
+// "instrument". Each is a set of recorded notes in sounds/<id>/, taken from
+// the FluidR3_GM soundfont (see sounds/README.md for the licence). `level`
+// evens the three out — the recordings peak around a tenth of full scale, and
+// a clarinet holds its level where a piano's has fallen away. `sustain` says
+// how much of a note's asked-for length the instrument is held for: a struck
+// or plucked note dies away by itself, but a blown one lasts as long as it is
+// let, and consecutive notes held their full length smear into each other.
+const INSTRUMENTS = [
+  { id: "piano", level: 7, sustain: 1 },
+  { id: "guitar", level: 5, sustain: 1 },
+  { id: "clarinet", level: 3.5, sustain: 0.55 },
+];
+const INSTRUMENT_STORAGE_KEY = "instrument";
+
+function findInstrument(id) {
+  return INSTRUMENTS.find((i) => i.id === id) || INSTRUMENTS[0];
+}
+
+let currentInstrument = findInstrument(
+  localStorage.getItem(INSTRUMENT_STORAGE_KEY),
+);
+
+// Every third semitone is recorded, A1 through Es6, which is the whole of what
+// the clefs, the key chords and an altered interval can ask for. A note in
+// between is the nearest recording played a semitone fast or slow — close
+// enough that the instrument still sounds like itself, at a third of the
+// download.
+const SAMPLE_NAMES = { 0: "C", 3: "Eb", 6: "Gb", 9: "A" };
+const SAMPLE_LOWEST_MIDI = 33;
+const SAMPLE_HIGHEST_MIDI = 87;
+const SAMPLE_STEP = 3;
+
+function sampleFile(instrumentId, midi) {
+  const name = SAMPLE_NAMES[midi % 12] + (Math.floor(midi / 12) - 1);
+  return `sounds/${instrumentId}/${name}.mp3`;
+}
+
+// Where a recording actually begins. An mp3 opens with a few hundredths of a
+// second of nothing, which is enough to put a note audibly behind the picture
+// it belongs to, so playback starts just ahead of the first real sample.
+function sampleOnset(buffer) {
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < data.length; i++) {
+    if (Math.abs(data[i]) > 0.002) {
+      return Math.max(0, i / buffer.sampleRate - 0.005);
+    }
+  }
+  return 0;
+}
+
+// The recordings of each instrument asked for so far, as a promise of
+// [{ midi, buffer, onset }] and — once it has settled — the list itself.
+// Decoded on an OfflineAudioContext, so loading at startup does not have to
+// open the real one before the player has pressed anything. A file that fails
+// to load is simply left out and its neighbours cover for it; with none at all
+// (the page opened straight off the disk, where fetch is refused) the list is
+// empty and playTone falls back to the synthesised note.
+const instrumentLoads = new Map();
+const instrumentSamples = new Map();
+
+function loadInstrument(instrument) {
+  if (instrumentLoads.has(instrument.id)) {
+    return instrumentLoads.get(instrument.id);
+  }
+  const decoder = new OfflineAudioContext(1, 1, 44100);
+  const loads = [];
+  for (
+    let midi = SAMPLE_LOWEST_MIDI;
+    midi <= SAMPLE_HIGHEST_MIDI;
+    midi += SAMPLE_STEP
+  ) {
+    loads.push(
+      fetch(sampleFile(instrument.id, midi))
+        .then((response) => {
+          if (!response.ok) throw new Error(response.statusText);
+          return response.arrayBuffer();
+        })
+        .then((data) => decoder.decodeAudioData(data))
+        .then((buffer) => ({ midi, buffer, onset: sampleOnset(buffer) }))
+        .catch(() => null),
+    );
+  }
+  const loading = Promise.all(loads).then((samples) => {
+    const loaded = samples.filter(Boolean);
+    instrumentSamples.set(instrument.id, loaded);
+    return loaded;
+  });
+  instrumentLoads.set(instrument.id, loading);
+  return loading;
+}
+
+// One note off the current instrument's recordings. Returns false when there
+// are none to play it from, which is playTone's cue to synthesise it instead.
+function playSample(freq, duration, delay, gain) {
+  const samples = instrumentSamples.get(currentInstrument.id);
+  if (!samples || samples.length === 0) return false;
+
+  const midi = 69 + 12 * Math.log2(freq / 440);
+  let nearest = samples[0];
+  for (const sample of samples) {
+    if (Math.abs(sample.midi - midi) < Math.abs(nearest.midi - midi)) {
+      nearest = sample;
+    }
+  }
+
+  const ctx = getAudioContext();
+  const now = ctx.currentTime + delay;
+  const length = duration * currentInstrument.sustain;
+  const level = gain * currentInstrument.level;
+
+  const source = ctx.createBufferSource();
+  source.buffer = nearest.buffer;
+  source.playbackRate.value = 2 ** ((midi - nearest.midi) / 12);
+
+  // Held, then let go over the last third rather than cut: the recording's own
+  // decay does the shaping, and this only keeps the end from clicking.
+  const env = ctx.createGain();
+  env.gain.setValueAtTime(level, now);
+  env.gain.setValueAtTime(level, now + length * 0.65);
+  env.gain.exponentialRampToValueAtTime(0.001, now + length);
+
+  source.connect(env);
+  env.connect(ctx.destination);
+  source.start(now, nearest.onset);
+  source.stop(now + length + 0.05);
+  return true;
+}
+
+// One note. `delay` schedules it that many seconds ahead on the audio clock
+// rather than on a timer, so the notes of a chord sound together; `gain` is
+// turned down for those, since three of them play at once. It is played off
+// the current instrument's recordings, and synthesised — layered sines with an
+// exponential decay, the sound the app had before it had recordings — while
+// those are still loading or where they cannot be had.
 function playTone(freq, duration = 1.2, delay = 0, gain = 0.5) {
   if (!Number.isFinite(freq)) return;
+  if (playSample(freq, duration, delay, gain)) return;
 
   const ctx = getAudioContext();
   const now = ctx.currentTime + delay;
@@ -299,6 +442,10 @@ const STRINGS = {
     "settings.language": "Kieli",
     "settings.clef": "Nuottiavain",
     "settings.theme": "Teema",
+    "settings.instrument": "Soitin",
+    "instrument.piano": "Piano",
+    "instrument.guitar": "Akustinen kitara",
+    "instrument.clarinet": "Klarinetti",
     "settings.ranges": "Nuottialue",
     "settings.noNotes": "T\u00e4ll\u00e4 avaimella ei ole viel\u00e4 nuotteja.",
     "menu.groupNotes": "Nuotit",
@@ -375,6 +522,9 @@ const STRINGS = {
     "intervals.prompt": "Mik\u00e4 intervalli?",
     "intervals.progress": "Intervalli {index} / {total}",
     "intervals.options": "Intervallipainikkeet",
+    "intervals.scale": "Intervallien valikoima",
+    "intervals.scaleMajor": "Duuriasteikkoiset intervallit",
+    "intervals.scaleAll": "Kaikki intervallit",
     "interval.1": "priimi",
     "interval.2": "sekunti",
     "interval.3": "terssi",
@@ -383,6 +533,12 @@ const STRINGS = {
     "interval.6": "seksti",
     "interval.7": "septimi",
     "interval.8": "oktaavi",
+    "interval.perfect": "puhdas",
+    "interval.major": "suuri",
+    "interval.minor": "pieni",
+    "interval.diminished": "v\u00e4hennetty",
+    "interval.augmented": "ylinouseva",
+    "intervals.qualities": "Intervallin laatu",
     "game.correct": "Oikein",
     "game.wrong": "V\u00e4\u00e4rin",
     "game.streak": "Putki",
@@ -420,6 +576,10 @@ const STRINGS = {
     "settings.language": "Spr\u00e5k",
     "settings.clef": "Klav",
     "settings.theme": "Tema",
+    "settings.instrument": "Instrument",
+    "instrument.piano": "Piano",
+    "instrument.guitar": "Akustisk gitarr",
+    "instrument.clarinet": "Klarinett",
     "settings.ranges": "Notomr\u00e5de",
     "settings.noNotes": "Den h\u00e4r klaven har inga noter \u00e4nnu.",
     "menu.groupNotes": "Noter",
@@ -496,6 +656,9 @@ const STRINGS = {
     "intervals.prompt": "Vilket intervall?",
     "intervals.progress": "Intervall {index} / {total}",
     "intervals.options": "Intervallknappar",
+    "intervals.scale": "Urval av intervall",
+    "intervals.scaleMajor": "Durskalans intervall",
+    "intervals.scaleAll": "Alla intervall",
     "interval.1": "prim",
     "interval.2": "sekund",
     "interval.3": "ters",
@@ -504,6 +667,12 @@ const STRINGS = {
     "interval.6": "sext",
     "interval.7": "septim",
     "interval.8": "oktav",
+    "interval.perfect": "ren",
+    "interval.major": "stor",
+    "interval.minor": "liten",
+    "interval.diminished": "f\u00f6rminskad",
+    "interval.augmented": "\u00f6verstigande",
+    "intervals.qualities": "Intervallets kvalitet",
     "game.correct": "R\u00e4tt",
     "game.wrong": "Fel",
     "game.streak": "I rad",
@@ -783,6 +952,8 @@ const keysStreakEl = document.getElementById("keys-streak");
 const intervalsScreen = document.getElementById("intervals-screen");
 const intervalsNotationEl = document.getElementById("intervals-notation");
 const intervalOptionsEl = document.getElementById("interval-options");
+const intervalScaleEl = document.getElementById("interval-scale");
+const intervalQualitiesEl = document.getElementById("interval-qualities");
 const intervalsProgressEl = document.getElementById("intervals-progress");
 const intervalsScoreEl = document.getElementById("intervals-score");
 const intervalsMistakesEl = document.getElementById("intervals-mistakes");
@@ -2140,21 +2311,86 @@ keyOptionsEl.addEventListener("animationend", (event) => {
 // count, so the answer sits in the same place every time and the pad becomes a
 // keyboard rather than a quiz.
 //
-// The number only, never the quality: every note in every pool is a natural and
-// no staff here carries a key signature, so "suuri" or "pieni" would be a
-// semitone count laid over a step count. Counting the lines and spaces is the
+// The number only, never the quality: counting the lines and spaces is the
 // skill this app is for.
 const INTERVAL_SIZES = [1, 2, 3, 4, 5, 6, 7, 8];
+
+// Which intervals a round is made of, picked on the round-length screen and
+// kept under "intervalScale". Every staff is signed in the lower note's own
+// major scale, so in a "major" round each interval up from it is a major or a
+// perfect one. "all" keeps the signature and puts an accidental of its own on
+// the upper note as often as not, which lets the minor, diminished and
+// augmented ones in — e to g under four sharps is a suuri terssi, and a pieni
+// one once the g wears a natural.
+const INTERVAL_SCALE_STORAGE_KEY = "intervalScale";
+let intervalScale =
+  localStorage.getItem(INTERVAL_SCALE_STORAGE_KEY) === "all" ? "all" : "major";
+
+function markIntervalScale() {
+  intervalScaleEl.querySelectorAll("[data-scale]").forEach((btn) => {
+    const active = btn.dataset.scale === intervalScale;
+    btn.classList.toggle("active", active);
+    btn.setAttribute("aria-checked", String(active));
+  });
+}
+
+intervalScaleEl.addEventListener("click", (event) => {
+  const btn = event.target.closest("[data-scale]");
+  if (!btn) return;
+  intervalScale = btn.dataset.scale;
+  localStorage.setItem(INTERVAL_SCALE_STORAGE_KEY, intervalScale);
+  markIntervalScale();
+});
+
+// What each degree of a major scale is called above its tonic, as a key into
+// STRINGS: the priimi, kvartti, kvintti and oktaavi are perfect, the rest
+// major. Indexed by size - 1.
+const MAJOR_SCALE_QUALITIES = [
+  "perfect",
+  "major",
+  "major",
+  "perfect",
+  "perfect",
+  "major",
+  "major",
+  "perfect",
+];
+
+// The qualities a round of all the intervals asks for, in the order they sit
+// above the pad. Keys into STRINGS, like the two above.
+const INTERVAL_QUALITIES = [
+  "perfect",
+  "minor",
+  "major",
+  "diminished",
+  "augmented",
+];
+
+// What a question's interval is, from what its size is in the major scale and
+// how far the upper note's accidental moves it off that: a semitone wider is
+// augmented whatever it started as, a semitone narrower is diminished for a
+// perfect interval and minor for a major one. The upper note never moves
+// further than that, so a diminished terssi does not come up.
+function intervalQuality(question) {
+  const base = MAJOR_SCALE_QUALITIES[question.size - 1];
+  if (question.top.alter > 0) return "augmented";
+  if (question.top.alter < 0) return base === "perfect" ? "diminished" : "minor";
+  return base;
+}
+
+// The major scale in semitones above its tonic, one entry per degree up to the
+// octave — which is as far as an interval here reaches.
+const MAJOR_SCALE = [0, 2, 4, 5, 7, 9, 11, 12];
 
 // A right answer is answered back with the count itself: the second note drops
 // onto the first and climbs to its place a step at a time, sounding each rung
 // and leaving its number beside it, so 1-2-3-4-5 is seen and heard on the way
 // to "kvintti". The step is fast enough that a long round is not held up by it,
 // and any answer key cuts it short anyway.
-const INTERVAL_WALK_STEP_MS = 320;
+const INTERVAL_WALK_STEP_MS = 420;
 // The beat at the top, after the two notes have sounded together, before the
 // next question replaces them.
-const INTERVAL_WALK_HOLD_MS = 750;
+const INTERVAL_WALK_HOLD_MS = 1500;
 
 // Where the two notes go, measured from where the clef leaves off: the first
 // note's inset, the gap to the second, and the staff left past it — which is
@@ -2189,13 +2425,113 @@ function makeIntervalQuestion() {
   const bottom = Math.floor(Math.random() * (pool.length - size + 1));
   // Every note from one end to the other, not just the two that are written:
   // the rungs are what the reveal climbs and counts, and a pool is a run of
-  // consecutive steps, so they are simply the slice between them.
+  // consecutive steps, so they are simply the slice between them. The lower
+  // note always comes first: an interval is counted up from its bottom note,
+  // and the signature names that note's scale, so it is the one to read first.
   const ladder = pool.slice(bottom, bottom + size);
-  // Read downward as often as upward: the count is the same either way, and a
-  // player who only ever reads upward has learned half of it. A priimi is the
-  // same note whichever way round it goes.
-  const descending = size > 1 && Math.random() < 0.5;
-  return { size, ladder: descending ? [...ladder].reverse() : ladder };
+  // The lower note is the tonic of the scale the staff is signed in.
+  const tonic = ladder[0];
+  const keys = intervalKeysFor(tonic.key[0]);
+  const key = keys[Math.floor(Math.random() * keys.length)];
+  // The upper note's own accidental, where the round has them. The question
+  // carries it, so one already dealt keeps reading and sounding as posed.
+  const top =
+    intervalScale === "all"
+      ? randomTopAccidental(key, ladder.at(-1), size)
+      : { sign: null, alter: 0 };
+  return { size, ladder, tonic, key, top };
+}
+
+// The most accidentals a signature may carry when its tonic is itself a
+// flattened or sharpened note.
+const INTERVAL_ALTERED_KEY_LIMIT = 6;
+
+// The major keys a lower note written on `letter` may be the tonic of. The
+// pool only has naturals, but the signature is what spells the tonic: a note
+// on the h line under two flats *is* a b, with nothing written beside it. So
+// the natural's own key is always on offer, however many accidentals it takes
+// (H major has five), and beside it whichever altered tonics stay within
+// INTERVAL_ALTERED_KEY_LIMIT — which today means B, Es, As, Des, Ges and Fis,
+// leaving out only the two keys of seven, Ces and Cis.
+function intervalKeysFor(letter) {
+  return KEYS.filter(
+    (key) =>
+      key.vf[0].toLowerCase() === letter &&
+      (key.vf.length === 1 ||
+        Math.abs(key.accidentals) <= INTERVAL_ALTERED_KEY_LIMIT),
+  );
+}
+
+// Which letters a signature alters, in the order it adds them.
+const SHARP_ORDER = ["f", "c", "g", "d", "a", "e", "b"];
+const FLAT_ORDER = ["b", "e", "a", "d", "g", "c", "f"];
+
+// What the signature does to a letter: +1 where it sharpens it, -1 where it
+// flattens it, 0 where it leaves it alone.
+function signatureAlteration(key, letter) {
+  const count = Math.abs(key.accidentals);
+  if (key.accidentals > 0 && SHARP_ORDER.slice(0, count).includes(letter)) {
+    return 1;
+  }
+  if (key.accidentals < 0 && FLAT_ORDER.slice(0, count).includes(letter)) {
+    return -1;
+  }
+  return 0;
+}
+
+// The pitches the upper note might be — flat, natural, sharp — as the sign
+// VexFlow draws for each and the semitones it stands off the natural.
+const TOP_ACCIDENTALS = [
+  { sign: "b", pitch: -1 },
+  { sign: "n", pitch: 0 },
+  { sign: "#", pitch: 1 },
+];
+
+// Draws the upper note's accidental for a round of all the intervals. `alter`
+// is how far it moves the note off the scale degree the signature gives it,
+// which is what the sound is built from; `sign` is what is written, and null
+// where the pick is what the signature already says. So a note the signature
+// leaves alone may come out flat, sharp or as it is, and one the signature
+// sharpens or flattens may be put back with a natural — "when needed" — or
+// left. Never more than a semitone off the scale: the other side of an altered
+// note would want a double sharp or flat, and a perfect interval moved two
+// ways is a doubly diminished one, which is a spelling exercise rather than a
+// count. A priimi is never lowered, since that would put the "upper" note
+// underneath the one whose scale the staff is signed in.
+function randomTopAccidental(key, note, size) {
+  const signed = signatureAlteration(key, note.key[0]);
+  const options = TOP_ACCIDENTALS.map(({ sign, pitch }) => ({
+    sign: pitch === signed ? null : sign,
+    alter: pitch - signed,
+  })).filter(
+    ({ alter }) => Math.abs(alter) <= 1 && !(size === 1 && alter < 0),
+  );
+  return options[Math.floor(Math.random() * options.length)];
+}
+
+// What a note of the question sounds like under its signature: the degree of
+// the tonic's major scale it sits on, rather than the natural its notehead
+// would be on a bare staff — a g over e is a gis once the staff says E major.
+// Counted in semitones off the tonic for the reason the triads are: the
+// spelling is the staff's business, the sound is what is wanted here.
+function intervalFrequency(question, note) {
+  const degree = diatonicStep(note.key) - diatonicStep(question.tonic.key);
+  // The tonic as the signature spells it: the written natural, moved by
+  // whatever the signature does to its own letter.
+  const tonicShift = signatureAlteration(question.key, question.tonic.key[0]);
+  return (
+    noteFrequency(question.tonic.key) *
+    2 ** ((tonicShift + MAJOR_SCALE[degree]) / 12)
+  );
+}
+
+// The upper note as it is written: its scale degree, moved by whatever
+// accidental of its own it carries.
+function intervalTopFrequency(question) {
+  return (
+    intervalFrequency(question, question.ladder.at(-1)) *
+    2 ** (question.top.alter / 12)
+  );
 }
 
 // One entry per question, built on demand and kept: a question the player is
@@ -2277,11 +2613,16 @@ function renderIntervalNotation() {
   context.setFillStyle(staffColor);
   context.setStrokeStyle(staffColor);
 
-  // How much room the clef takes, measured off a stave that is never drawn —
-  // the F clef and the G clef are not the same width, and the notes start
-  // wherever the one being shown ends.
+  // How much room the clef and the signature take, measured off a stave that
+  // is never drawn — the clefs are not all the same width and a signature runs
+  // from nothing (C) to five sharps (H), and the notes start wherever they end.
+  const question = intervalWalk
+    ? intervalWalk.question
+    : intervalQuestions[currentIndex];
+
   const probe = new Stave(0, 0, available);
   probe.addClef(currentClef.id);
+  if (question?.key) probe.addKeySignature(question.key.vf);
   probe.setContext(context);
   const noteStart = probe.getNoteStartX();
   const staveWidth = Math.min(
@@ -2292,6 +2633,8 @@ function renderIntervalNotation() {
 
   const stave = new Stave(10, 30, staveWidth);
   stave.addClef(currentClef.id);
+  // The lower note's major scale, so the two notes read as degrees of it.
+  if (question?.key) stave.addKeySignature(question.key.vf);
   // Same reason as the note game's: VexFlow's default ledger grey vanishes on
   // the dark themes.
   stave.setDefaultLedgerLineStyle({
@@ -2300,10 +2643,13 @@ function renderIntervalNotation() {
     lineWidth: 2,
   });
   stave.setContext(context).draw();
+  // Faded, the way the notes still to come are in the note game: the signature
+  // is context for the two notes, not the thing being asked about.
+  tintKeySignature(
+    intervalsNotationEl,
+    styles.getPropertyValue("--note-future").trim(),
+  );
 
-  const question = intervalWalk
-    ? intervalWalk.question
-    : intervalQuestions[currentIndex];
   // The clef is drawn but the pool is empty, so there is no interval to pose.
   if (!question) {
     const hint = document.createElement("p");
@@ -2320,6 +2666,13 @@ function renderIntervalNotation() {
     ? question.ladder[intervalWalk.step]
     : question.ladder.at(-1);
 
+  // The upper note's own accidental belongs to the place it is written, so
+  // the climbing note only puts it on when it has got back there — the rungs
+  // on the way are plain degrees of the scale.
+  const atTop =
+    !intervalWalk || intervalWalk.step === question.ladder.length - 1;
+  const topSign = atTop ? question.top.sign : null;
+
   const color = styles.getPropertyValue("--note-current").trim();
   const staveNotes = [question.ladder[0], climbing].map((note, i) => {
     const stemDown =
@@ -2331,6 +2684,14 @@ function renderIntervalNotation() {
       stem_direction: stemDown ? -1 : 1,
     });
     sn.setStyle({ fillStyle: color, strokeStyle: color });
+    if (i === 1 && topSign) {
+      const accidental = new Accidental(topSign);
+      accidental.setStyle({ fillStyle: color, strokeStyle: color });
+      sn.addModifier(accidental, 0);
+      // Formatting is what moves an accidental clear of its notehead, and with
+      // no Formatter here the modifier context has to be handed over by hand.
+      sn.addToModifierContext(new ModifierContext());
+    }
     sn.setContext(context).setStave(stave);
     // A tick context each, so the x is ours to set — the same handling the
     // range editor gives its notes, and for the same reason.
@@ -2347,9 +2708,69 @@ function renderIntervalNotation() {
   }
 }
 
+// The quality picked for the question on the staff, or null before one is. In
+// a round of all the intervals the answer has two halves, and this is the
+// first: it is chosen and stays lit, and the number then answers with it — so
+// the number is still the key that commits, as it is in a major-scale round.
+let pickedIntervalQuality = null;
+
+function markIntervalQuality() {
+  intervalQualitiesEl.classList.remove("nudge");
+  intervalQualitiesEl.querySelectorAll("[data-quality]").forEach((btn) => {
+    const active = btn.dataset.quality === pickedIntervalQuality;
+    btn.classList.toggle("active", active);
+    btn.setAttribute("aria-checked", String(active));
+  });
+}
+
+function pickIntervalQuality(quality) {
+  if (!gameActive || gameMode !== "intervals") return;
+  // Picking the next answer's quality is as good a sign as any that the climb
+  // has been read, so it cuts it short like an answer key does.
+  if (intervalWalk) finishIntervalWalk();
+  if (!gameActive) return;
+  pickedIntervalQuality = quality;
+  markIntervalQuality();
+}
+
+// The row above the pad. Only a round of all the intervals has it: in a
+// major-scale one each size has one quality and the pad already names it.
+function buildIntervalQualities() {
+  intervalQualitiesEl.replaceChildren();
+  intervalQualitiesEl.hidden = intervalScale !== "all";
+  for (const quality of INTERVAL_QUALITIES) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "interval-quality";
+    btn.dataset.quality = quality;
+    btn.setAttribute("role", "radio");
+    btn.textContent = t(`interval.${quality}`);
+    intervalQualitiesEl.appendChild(btn);
+  }
+  markIntervalQuality();
+}
+
+intervalQualitiesEl.addEventListener("click", (event) => {
+  const btn = event.target.closest("[data-quality]");
+  if (btn) pickIntervalQuality(btn.dataset.quality);
+});
+
+// Restarts an element's shake, for a second wrong press on the same thing.
+function shake(el, className = "wrong") {
+  if (!el) return;
+  el.classList.remove(className);
+  void el.offsetWidth;
+  el.classList.add(className);
+}
+
 // The eight answers, in their own order and never in any other. Rebuilt on a
-// language change, since each carries the interval's name under its numeral.
+// language change, since each carries the interval's name under its numeral,
+// and at the start of a round, since a major-scale one names the quality too:
+// there each size has exactly one — "puhdas kvintti", "suuri terssi" — so it
+// is part of the name rather than a second thing to answer. A round of all the
+// intervals keeps the bare names, a terssi there being either kind.
 function buildIntervalOptions() {
+  buildIntervalQualities();
   intervalOptionsEl.replaceChildren();
   for (const size of INTERVAL_SIZES) {
     const btn = document.createElement("button");
@@ -2363,7 +2784,13 @@ function buildIntervalOptions() {
 
     const name = document.createElement("span");
     name.className = "interval-option-name";
-    name.textContent = t(`interval.${size}`);
+    if (intervalScale === "major") {
+      const quality = document.createElement("span");
+      quality.className = "interval-option-quality";
+      quality.textContent = t(`interval.${MAJOR_SCALE_QUALITIES[size - 1]}`);
+      name.append(quality, " ");
+    }
+    name.append(t(`interval.${size}`));
 
     btn.append(numeral, name);
     intervalOptionsEl.appendChild(btn);
@@ -2372,22 +2799,46 @@ function buildIntervalOptions() {
 
 // The two ends sounded together at the top of the climb: the count just made,
 // heard in one go as the thing it was counting.
+const INTERVAL_TOGETHER_SECONDS = 2.4;
+
 function playIntervalTogether(question) {
-  playPianoNote(question.ladder[0].key);
-  playPianoNote(question.ladder.at(-1).key);
+  playTone(
+    intervalFrequency(question, question.ladder[0]),
+    INTERVAL_TOGETHER_SECONDS,
+  );
+  playTone(intervalTopFrequency(question), INTERVAL_TOGETHER_SECONDS);
+}
+
+// How long a rung of the climb sounds, in seconds, and how many rungs' worth
+// the last one gets — both its sound and the wait before the two are heard
+// together. The note the climb arrives on is the one the count was for, so it
+// is the one held: a run of even steps ends before it has been heard to end.
+const INTERVAL_WALK_NOTE_SECONDS = 0.9;
+const INTERVAL_WALK_LAST_NOTE_LENGTHS = 2;
+
+// How many rungs' worth of time the rung the climb is on takes.
+function intervalWalkLengths(walk) {
+  return walk.step === walk.question.ladder.length - 1
+    ? INTERVAL_WALK_LAST_NOTE_LENGTHS
+    : 1;
 }
 
 // Starts the reveal: the second note back down on the first, and then a rung
-// every INTERVAL_WALK_STEP_MS until it is home.
+// every INTERVAL_WALK_STEP_MS until it is home. A priimi's one rung is its
+// last, so it is held like any other climb's.
 function startIntervalWalk(question) {
   clearIntervalWalk();
   intervalWalk = { question, step: 0 };
-  playPianoNote(question.ladder[0].key, 0.9);
+  playTone(
+    intervalFrequency(question, question.ladder[0]),
+    INTERVAL_WALK_NOTE_SECONDS * intervalWalkLengths(intervalWalk),
+  );
   renderIntervalNotation();
   scheduleIntervalWalkStep();
 }
 
 function scheduleIntervalWalkStep() {
+  const wait = INTERVAL_WALK_STEP_MS * intervalWalkLengths(intervalWalk);
   intervalWalkTimer = setTimeout(() => {
     intervalWalkTimer = null;
     const walk = intervalWalk;
@@ -2395,7 +2846,13 @@ function scheduleIntervalWalkStep() {
 
     if (walk.step < walk.question.ladder.length - 1) {
       walk.step += 1;
-      playPianoNote(walk.question.ladder[walk.step].key, 0.9);
+      const { question } = walk;
+      playTone(
+        walk.step === question.ladder.length - 1
+          ? intervalTopFrequency(question)
+          : intervalFrequency(question, question.ladder[walk.step]),
+        INTERVAL_WALK_NOTE_SECONDS * intervalWalkLengths(walk),
+      );
       renderIntervalNotation();
       scheduleIntervalWalkStep();
       return;
@@ -2403,7 +2860,7 @@ function scheduleIntervalWalkStep() {
 
     playIntervalTogether(walk.question);
     intervalWalkTimer = setTimeout(finishIntervalWalk, INTERVAL_WALK_HOLD_MS);
-  }, INTERVAL_WALK_STEP_MS);
+  }, wait);
 }
 
 // The end of the reveal, whether it was watched through or cut short. This is
@@ -2411,6 +2868,8 @@ function scheduleIntervalWalkStep() {
 // all the way through the climb.
 function finishIntervalWalk() {
   clearIntervalWalk();
+  pickedIntervalQuality = null;
+  markIntervalQuality();
   currentIndex += 1;
   updateStatus();
   if (currentIndex >= totalNotes) {
@@ -2441,7 +2900,19 @@ function handleIntervalGuess(size) {
   const question = intervalQuestions[currentIndex];
   if (!question) return;
 
-  if (size === question.size) {
+  // A round of all the intervals is answered in two halves, and a number with
+  // no quality picked is half an answer: it is pointed back at the row above
+  // rather than counted, since nothing has been got wrong yet.
+  const needsQuality = intervalScale === "all";
+  if (needsQuality && pickedIntervalQuality === null) {
+    shake(intervalQualitiesEl, "nudge");
+    return;
+  }
+  const sizeRight = size === question.size;
+  const qualityRight =
+    !needsQuality || pickedIntervalQuality === intervalQuality(question);
+
+  if (sizeRight && qualityRight) {
     correct += 1;
     streak += 1;
     triggerFeedback("correct", intervalsNotationEl);
@@ -2454,13 +2925,19 @@ function handleIntervalGuess(size) {
     streak = 0;
     triggerFeedback("wrong", intervalsNotationEl);
     updateStatus();
-    const missed = intervalOptionsEl.querySelector(
-      `[data-interval="${size}"]`,
-    );
-    if (missed) {
-      missed.classList.remove("wrong");
-      void missed.offsetWidth;
-      missed.classList.add("wrong");
+    // One mistake however many halves were wrong, but each wrong half shakes,
+    // so it is plain which one to think again about. A wrong quality is also
+    // let go of; a right one stays picked for the next try at the number.
+    if (!sizeRight) {
+      shake(intervalOptionsEl.querySelector(`[data-interval="${size}"]`));
+    }
+    if (!qualityRight) {
+      const missed = intervalQualitiesEl.querySelector(
+        `[data-quality="${pickedIntervalQuality}"]`,
+      );
+      pickedIntervalQuality = null;
+      markIntervalQuality();
+      shake(missed);
     }
   }
 }
@@ -2472,6 +2949,8 @@ function startIntervalsGame() {
   correct = 0;
   wrong = 0;
   streak = 0;
+  pickedIntervalQuality = null;
+  buildIntervalOptions();
   renderIntervalsRound();
   updateStatus();
 }
@@ -3010,6 +3489,7 @@ function showSetup(mode = gameMode) {
   setupTitleEl.dataset.i18n =
     SETUP_TITLE_KEYS[mode] ?? SETUP_TITLE_KEYS.notes;
   setupTitleEl.textContent = t(setupTitleEl.dataset.i18n);
+  intervalScaleEl.hidden = mode !== "intervals";
   buildNoteCountOptions();
   showScreen(setupScreen);
 }
@@ -3197,6 +3677,20 @@ window.addEventListener("keydown", (event) => {
   // kvintti — which is why its pad never reshuffles: the key and the button
   // say the same thing, and both say it in the same place every time.
   if (gameMode === "intervals") {
+    // The qualities have no numbers of their own to be typed, the digits
+    // being taken, so the arrows walk the pick along the row instead.
+    if (
+      intervalScale === "all" &&
+      (event.key === "ArrowLeft" || event.key === "ArrowRight")
+    ) {
+      event.preventDefault();
+      const step = event.key === "ArrowRight" ? 1 : -1;
+      const count = INTERVAL_QUALITIES.length;
+      const at = INTERVAL_QUALITIES.indexOf(pickedIntervalQuality);
+      const next = at === -1 ? (step === 1 ? 0 : count - 1) : at + step;
+      pickIntervalQuality(INTERVAL_QUALITIES[(next + count) % count]);
+      return;
+    }
     const choice = Number(event.key);
     if (!Number.isInteger(choice) || !INTERVAL_SIZES.includes(choice)) return;
     handleIntervalGuess(choice);
@@ -3297,6 +3791,45 @@ function buildLangMenu() {
   }
 }
 
+// --- Instrument picker (a section of the settings menu) ---
+// Shares the language list's rules, like the clef list does. Rebuilt on a
+// language change, since the names are translated.
+const instrumentMenu = document.getElementById("instrument-menu");
+
+function buildInstrumentMenu() {
+  instrumentMenu.replaceChildren();
+  for (const instrument of INSTRUMENTS) {
+    const btn = document.createElement("button");
+    btn.className = "lang-menu-item";
+    btn.dataset.instrument = instrument.id;
+    btn.setAttribute("role", "option");
+    btn.classList.toggle("active", instrument.id === currentInstrument.id);
+    btn.textContent = t(`instrument.${instrument.id}`);
+    instrumentMenu.appendChild(btn);
+  }
+}
+
+// The note a pick is answered with, so the choice is heard rather than taken
+// on trust: the a every clef's pool holds.
+const INSTRUMENT_PREVIEW_NOTE = "a/3";
+
+function applyInstrument(id) {
+  currentInstrument = findInstrument(id);
+  localStorage.setItem(INSTRUMENT_STORAGE_KEY, currentInstrument.id);
+  buildInstrumentMenu();
+  // Sounded once the recordings are in, and only if this is still the pick —
+  // a second click while the first was loading should not be answered twice.
+  const picked = currentInstrument;
+  loadInstrument(picked).then(() => {
+    if (currentInstrument === picked) playPianoNote(INSTRUMENT_PREVIEW_NOTE);
+  });
+}
+
+instrumentMenu.addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-instrument]");
+  if (btn) applyInstrument(btn.dataset.instrument);
+});
+
 // The markup holds the Finnish text plus a data-i18n key naming its string;
 // data-i18n-aria does the same for labels that are only read out.
 function translateStaticText() {
@@ -3318,6 +3851,7 @@ function applyLanguage(langId) {
   // <title> carries a data-i18n key like every other static string.
   translateStaticText();
   buildLangMenu();
+  buildInstrumentMenu();
   buildThemeMenu();
   buildClefMenu();
   buildNoteCountOptions();
@@ -3564,6 +4098,10 @@ buildIntervalOptions();
 buildRangeEditor();
 buildNotePad();
 markCardOrder();
+markIntervalScale();
+// Fetched now rather than at the first note, which would otherwise have to be
+// synthesised while its recording was still on the way.
+loadInstrument(currentInstrument);
 // Last, so it can rebuild every menu above in the saved language.
 applyLanguage(currentLanguage.id);
 showMenu();
