@@ -96,6 +96,9 @@ function sampleOnset(buffer) {
 const instrumentLoads = new Map();
 const instrumentSamples = new Map();
 
+// An instrument may name a narrower run of recordings than the full one with
+// `low` and `high` — the listening game's instruments only have the octave and
+// a half they are played in.
 function loadInstrument(instrument) {
   if (instrumentLoads.has(instrument.id)) {
     return instrumentLoads.get(instrument.id);
@@ -103,8 +106,8 @@ function loadInstrument(instrument) {
   const decoder = new OfflineAudioContext(1, 1, 44100);
   const loads = [];
   for (
-    let midi = SAMPLE_LOWEST_MIDI;
-    midi <= SAMPLE_HIGHEST_MIDI;
+    let midi = instrument.low ?? SAMPLE_LOWEST_MIDI;
+    midi <= (instrument.high ?? SAMPLE_HIGHEST_MIDI);
     midi += SAMPLE_STEP
   ) {
     loads.push(
@@ -127,11 +130,12 @@ function loadInstrument(instrument) {
   return loading;
 }
 
-// One note off the current instrument's recordings. Returns false when there
-// are none to play it from, which is playTone's cue to synthesise it instead.
-function playSample(freq, duration, delay, gain) {
-  const samples = instrumentSamples.get(currentInstrument.id);
-  if (!samples || samples.length === 0) return false;
+// One note off an instrument's recordings, `length` seconds of it. Returns the
+// nodes playing it, so a caller that may need to cut it short can, or null when
+// there are no recordings to play it from.
+function startSample(instrument, freq, length, delay, gain) {
+  const samples = instrumentSamples.get(instrument.id);
+  if (!samples || samples.length === 0) return null;
 
   const midi = 69 + 12 * Math.log2(freq / 440);
   let nearest = samples[0];
@@ -143,8 +147,7 @@ function playSample(freq, duration, delay, gain) {
 
   const ctx = getAudioContext();
   const now = ctx.currentTime + delay;
-  const length = duration * currentInstrument.sustain;
-  const level = gain * currentInstrument.level;
+  const level = gain * instrument.level;
 
   const source = ctx.createBufferSource();
   source.buffer = nearest.buffer;
@@ -161,7 +164,14 @@ function playSample(freq, duration, delay, gain) {
   env.connect(ctx.destination);
   source.start(now, nearest.onset);
   source.stop(now + length + 0.05);
-  return true;
+  return { source, env };
+}
+
+// One note off the current instrument's recordings. Returns false when there
+// are none to play it from, which is playTone's cue to synthesise it instead.
+function playSample(freq, duration, delay, gain) {
+  const length = duration * currentInstrument.sustain;
+  return startSample(currentInstrument, freq, length, delay, gain) !== null;
 }
 
 // One note. `delay` schedules it that many seconds ahead on the audio clock
@@ -467,10 +477,14 @@ const STRINGS = {
     "menu.groupIntervals": "Intervallit",
     "menu.intervals": "Tunnista intervalli",
     "menu.intervalsNote": "Nime\u00e4 kahden nuotin v\u00e4li.",
+    "menu.groupInstruments": "Soittimet",
+    "menu.listening": "Tunnista soitin",
+    "menu.listeningNote": "Kuuntele ja valitse oikea soitin.",
     "nav.back": "Takaisin",
     "setup.title": "Valitse nuottien m\u00e4\u00e4r\u00e4.",
     "setup.titleKeys": "Valitse s\u00e4vellajien m\u00e4\u00e4r\u00e4.",
     "setup.titleIntervals": "Valitse intervallien m\u00e4\u00e4r\u00e4.",
+    "setup.titleListening": "Valitse soitinten m\u00e4\u00e4r\u00e4.",
     "setup.played": "{label} \u2014 pelattu l\u00e4pi",
     "setup.melodyHeading": "Tai soita koko s\u00e4velm\u00e4",
     "melody.mary-lamb": "Maijall' oli karitsa",
@@ -539,6 +553,32 @@ const STRINGS = {
     "interval.diminished": "v\u00e4hennetty",
     "interval.augmented": "ylinouseva",
     "intervals.qualities": "Intervallin laatu",
+    "listening.prompt": "Mik\u00e4 soitin?",
+    "listening.progress": "Soitin {index} / {total}",
+    "listening.options": "Soitinvaihtoehdot",
+    "listening.replay": "Kuuntele uudelleen",
+    "listen.guitar": "Kitara",
+    "listen.eguitar": "S\u00e4hk\u00f6kitara",
+    "listen.upright": "Piano",
+    "listen.grand": "Flyygeli",
+    "listen.epiano": "S\u00e4hk\u00f6piano",
+    "listen.organ": "Kirkkourut",
+    "listen.accordion": "Harmonikka",
+    "listen.bandoneon": "Bandoneon",
+    "listen.clarinet": "Klarinetti",
+    "listen.oboe": "Oboe",
+    "listen.flute": "Poikkihuilu",
+    "listen.recorder": "Nokkahuilu",
+    "listen.trumpet": "Trumpetti",
+    "listen.horn": "K\u00e4yr\u00e4torvi",
+    "listen.trombone": "Pasuuna",
+    "listen.tuba": "Tuuba",
+    "listen.violin": "Viulu",
+    "listen.viola": "Alttoviulu",
+    "listen.cello": "Sello",
+    "listen.contrabass": "Kontrabasso",
+    "listen.ebass": "S\u00e4hk\u00f6basso",
+    "listen.theremin": "Theremin",
     "game.correct": "Oikein",
     "game.wrong": "V\u00e4\u00e4rin",
     "game.streak": "Putki",
@@ -601,10 +641,14 @@ const STRINGS = {
     "menu.groupIntervals": "Intervall",
     "menu.intervals": "K\u00e4nn igen intervallet",
     "menu.intervalsNote": "Namnge avst\u00e5ndet mellan tv\u00e5 noter.",
+    "menu.groupInstruments": "Instrument",
+    "menu.listening": "K\u00e4nn igen instrumentet",
+    "menu.listeningNote": "Lyssna och v\u00e4lj r\u00e4tt instrument.",
     "nav.back": "Tillbaka",
     "setup.title": "V\u00e4lj antal noter.",
     "setup.titleKeys": "V\u00e4lj antal tonarter.",
     "setup.titleIntervals": "V\u00e4lj antal intervall.",
+    "setup.titleListening": "V\u00e4lj antal instrument.",
     "setup.played": "{label} \u2014 genomspelad",
     "setup.melodyHeading": "Eller spela en hel melodi",
     "melody.mary-lamb": "Mary hade ett litet lamm",
@@ -673,6 +717,32 @@ const STRINGS = {
     "interval.diminished": "f\u00f6rminskad",
     "interval.augmented": "\u00f6verstigande",
     "intervals.qualities": "Intervallets kvalitet",
+    "listening.prompt": "Vilket instrument?",
+    "listening.progress": "Instrument {index} / {total}",
+    "listening.options": "Instrumentalternativ",
+    "listening.replay": "Lyssna igen",
+    "listen.guitar": "Gitarr",
+    "listen.eguitar": "Elgitarr",
+    "listen.upright": "Piano",
+    "listen.grand": "Flygel",
+    "listen.epiano": "Elpiano",
+    "listen.organ": "Kyrkorgel",
+    "listen.accordion": "Dragspel",
+    "listen.bandoneon": "Bandoneon",
+    "listen.clarinet": "Klarinett",
+    "listen.oboe": "Oboe",
+    "listen.flute": "Tv\u00e4rfl\u00f6jt",
+    "listen.recorder": "Blockfl\u00f6jt",
+    "listen.trumpet": "Trumpet",
+    "listen.horn": "Valthorn",
+    "listen.trombone": "Trombon",
+    "listen.tuba": "Tuba",
+    "listen.violin": "Violin",
+    "listen.viola": "Altfiol",
+    "listen.cello": "Cello",
+    "listen.contrabass": "Kontrabas",
+    "listen.ebass": "Elbas",
+    "listen.theremin": "Theremin",
     "game.correct": "R\u00e4tt",
     "game.wrong": "Fel",
     "game.streak": "I rad",
@@ -953,6 +1023,14 @@ const intervalsScreen = document.getElementById("intervals-screen");
 const intervalsNotationEl = document.getElementById("intervals-notation");
 const intervalOptionsEl = document.getElementById("interval-options");
 const intervalScaleEl = document.getElementById("interval-scale");
+const listeningScreen = document.getElementById("listening-screen");
+const listeningStageEl = document.getElementById("listening-stage");
+const listeningReplayBtn = document.getElementById("listening-replay");
+const listeningOptionsEl = document.getElementById("listening-options");
+const listeningProgressEl = document.getElementById("listening-progress");
+const listeningScoreEl = document.getElementById("listening-score");
+const listeningMistakesEl = document.getElementById("listening-mistakes");
+const listeningStreakEl = document.getElementById("listening-streak");
 const intervalQualitiesEl = document.getElementById("interval-qualities");
 const intervalsProgressEl = document.getElementById("intervals-progress");
 const intervalsScoreEl = document.getElementById("intervals-score");
@@ -1168,7 +1246,12 @@ function triggerFeedback(type, target = notationEl) {
   target.classList.add(type === "correct" ? "anim-correct" : "anim-wrong");
 }
 
-for (const area of [notationEl, keysNotationEl, intervalsNotationEl]) {
+for (const area of [
+  notationEl,
+  keysNotationEl,
+  intervalsNotationEl,
+  listeningStageEl,
+]) {
   area.addEventListener("animationend", () => {
     area.classList.remove("anim-correct", "anim-wrong");
   });
@@ -1198,6 +1281,13 @@ const STATUS_BLOCKS = {
     streak: intervalsStreakEl,
     progress: intervalsProgressEl,
     progressKey: "intervals.progress",
+  },
+  listening: {
+    score: listeningScoreEl,
+    mistakes: listeningMistakesEl,
+    streak: listeningStreakEl,
+    progress: listeningProgressEl,
+    progressKey: "listening.progress",
   },
 };
 
@@ -2299,6 +2389,366 @@ keyOptionsEl.addEventListener("click", (event) => {
 
 keyOptionsEl.addEventListener("animationend", (event) => {
   event.target.classList.remove("wrong");
+});
+
+// --- Listening game ---
+// An instrument is heard and four are shown; the one that was playing is the
+// answer. The question is the sound alone, so the options can carry both a
+// picture and a name without giving anything away — and learning which name
+// and which shape go with which sound is the point.
+//
+// `voice` is what plays it: a set of recordings in sounds/<id>/ like the ones
+// the settings offer, but only the octave and a half the instrument is heard
+// in here (`low` to `high`, every third semitone). `level` evens them out the
+// way INSTRUMENTS' does, measured off the files. `held` marks the blown, bowed
+// and squeezed ones, whose notes last as long as they are let: those are given
+// exactly their beats, where a struck or plucked note is left to ring.
+// The flyygeli, the guitar and the clarinet are the settings' own instruments,
+// so their recordings are shared rather than fetched twice. `twin` names an
+// instrument this one is never offered beside: nobody tells an upright from a
+// grand by a soundfont, and a question that cannot be answered by listening
+// has no business in a listening game.
+const LISTENING_INSTRUMENTS = [
+  { id: "guitar", voice: findInstrument("guitar"), root: 45 },
+  { id: "eguitar", voice: { id: "eguitar", level: 5.8, low: 48, high: 66 } },
+  { id: "upright", twin: "grand", voice: { id: "upright", level: 7, low: 48, high: 66 } },
+  { id: "grand", twin: "upright", voice: findInstrument("piano"), root: 48 },
+  { id: "epiano", voice: { id: "epiano", level: 7.5, low: 48, high: 66 } },
+  { id: "organ", held: true, voice: { id: "organ", level: 3.7, low: 48, high: 66 } },
+  { id: "accordion", held: true, voice: { id: "accordion", level: 5.5, low: 54, high: 72 } },
+  { id: "bandoneon", held: true, voice: { id: "bandoneon", level: 5.5, low: 48, high: 66 } },
+  { id: "clarinet", held: true, voice: findInstrument("clarinet"), root: 54 },
+  { id: "oboe", held: true, voice: { id: "oboe", level: 3, low: 60, high: 78 } },
+  { id: "flute", held: true, voice: { id: "flute", level: 3.4, low: 63, high: 81 } },
+  { id: "recorder", held: true, voice: { id: "recorder", level: 3, low: 66, high: 84 } },
+  { id: "trumpet", held: true, voice: { id: "trumpet", level: 5.5, low: 57, high: 75 } },
+  { id: "horn", held: true, voice: { id: "horn", level: 3.7, low: 45, high: 63 } },
+  { id: "trombone", held: true, voice: { id: "trombone", level: 3.3, low: 42, high: 60 } },
+  { id: "tuba", held: true, voice: { id: "tuba", level: 3, low: 33, high: 51 } },
+  { id: "violin", held: true, voice: { id: "violin", level: 3.5, low: 57, high: 75 } },
+  { id: "viola", held: true, voice: { id: "viola", level: 3.7, low: 48, high: 66 } },
+  { id: "cello", held: true, voice: { id: "cello", level: 3.6, low: 36, high: 54 } },
+  { id: "contrabass", held: true, voice: { id: "contrabass", level: 4, low: 30, high: 48 } },
+  { id: "ebass", voice: { id: "ebass", level: 5, low: 30, high: 48 } },
+  // No recording at all: a theremin is an oscillator and a hand, and that much
+  // the browser has. See startTheremin.
+  { id: "theremin", held: true, root: 62 },
+];
+
+// How many answers a question offers, and the highest number key that picks
+// one — the same four as the key game.
+const LISTENING_CHOICES = 4;
+
+// What is played: a handful of short figures, as semitones above the note each
+// starts on paired with a length in beats. All of them stay inside an octave,
+// which is what the recordings cover, and none is a tune anyone knows — the
+// figure and the key change from question to question so that what is
+// recognised is the instrument and not the phrase.
+const LISTENING_PHRASES = [
+  [[0, 1], [4, 1], [7, 1], [12, 2]],
+  [[0, 1], [2, 1], [4, 1], [5, 1], [7, 2]],
+  [[7, 1], [4, 1], [0, 1], [4, 1], [7, 2]],
+  [[12, 1], [7, 1], [9, 1], [5, 1], [7, 2]],
+  [[0, 1], [7, 1], [5, 1], [4, 1], [2, 1], [0, 2]],
+];
+const LISTENING_BEAT_SECONDS = 0.4;
+// How long a struck or plucked note is left to ring past its own beats.
+const LISTENING_RING_SECONDS = 0.9;
+// How many semitones above its lowest starting note a phrase may begin. The
+// recordings reach an octave and a half and a phrase spans an octave, so this
+// is the half.
+const LISTENING_ROOT_SPREAD = 6;
+
+// One entry per question, built on demand and kept, like the other games': a
+// question still being got wrong keeps its four answers and its phrase, so a
+// replay is the same thing heard again.
+let listeningQuestions = [];
+
+function listeningChoices(answer) {
+  const others = LISTENING_INSTRUMENTS.filter(
+    (instrument) => instrument.id !== answer.id && instrument.id !== answer.twin,
+  );
+  return shuffled([
+    answer,
+    ...shuffled(others).slice(0, LISTENING_CHOICES - 1),
+  ]);
+}
+
+function ensureListeningQuestion(index) {
+  while (listeningQuestions.length <= index) {
+    // Never the same instrument twice running: heard back to back, the second
+    // would be answered from the first rather than from its sound.
+    const previous = listeningQuestions.at(-1)?.instrument;
+    const pool = LISTENING_INSTRUMENTS.filter((i) => i !== previous);
+    const instrument = pool[Math.floor(Math.random() * pool.length)];
+    const lowest = instrument.root ?? instrument.voice.low;
+    listeningQuestions.push({
+      instrument,
+      choices: listeningChoices(instrument),
+      phrase:
+        LISTENING_PHRASES[Math.floor(Math.random() * LISTENING_PHRASES.length)],
+      root: lowest + Math.floor(Math.random() * (LISTENING_ROOT_SPREAD + 1)),
+    });
+    // Fetched as soon as the question exists, which for every question but the
+    // first is a whole answer ahead of when it is needed.
+    if (instrument.voice) loadInstrument(instrument.voice);
+  }
+  return listeningQuestions[index];
+}
+
+// A theremin, synthesised: one oscillator whose pitch slides from note to note
+// instead of stepping, with the slow wobble of a hand held in the air, and a
+// second an octave up for a little of the edge the real one has. `notes` is
+// [{ freq, at, length }] in seconds from now. Returns its nodes in the shape
+// startSample does, so the phrase player can stop either kind the same way.
+const THEREMIN_GLIDE_SECONDS = 0.11;
+const THEREMIN_VIBRATO_HZ = 5.6;
+const THEREMIN_VIBRATO_CENTS = 28;
+
+function startTheremin(notes, gain) {
+  const ctx = getAudioContext();
+  const now = ctx.currentTime;
+  const end = now + notes.at(-1).at + notes.at(-1).length;
+
+  const env = ctx.createGain();
+  env.gain.setValueAtTime(0.0001, now);
+  env.gain.exponentialRampToValueAtTime(gain, now + 0.12);
+  env.gain.setValueAtTime(gain, end - 0.3);
+  env.gain.exponentialRampToValueAtTime(0.0001, end);
+  env.connect(ctx.destination);
+
+  const vibrato = ctx.createOscillator();
+  const depth = ctx.createGain();
+  vibrato.frequency.value = THEREMIN_VIBRATO_HZ;
+  depth.gain.value = THEREMIN_VIBRATO_CENTS;
+  vibrato.connect(depth);
+
+  const voices = [
+    { type: "sine", ratio: 1, level: 1 },
+    { type: "triangle", ratio: 2, level: 0.12 },
+  ].map(({ type, ratio, level }) => {
+    const osc = ctx.createOscillator();
+    const mix = ctx.createGain();
+    osc.type = type;
+    mix.gain.value = level;
+    let pitch = notes[0].freq * ratio;
+    osc.frequency.setValueAtTime(pitch, now);
+    for (const note of notes.slice(1)) {
+      // Held where it is until just before the next note, then slid there.
+      const arrive = now + note.at;
+      osc.frequency.setValueAtTime(pitch, arrive - THEREMIN_GLIDE_SECONDS);
+      pitch = note.freq * ratio;
+      osc.frequency.exponentialRampToValueAtTime(pitch, arrive);
+    }
+    depth.connect(osc.detune);
+    osc.connect(mix);
+    mix.connect(env);
+    osc.start(now);
+    osc.stop(end + 0.05);
+    return osc;
+  });
+  vibrato.start(now);
+  vibrato.stop(end + 0.05);
+
+  return [...voices, vibrato].map((source) => ({ source, env }));
+}
+
+// Whatever of a phrase is still sounding, so it can be cut off when the next
+// one starts or the screen is left. Without this a quick answer would lay the
+// next instrument over the tail of the last.
+let listeningVoices = [];
+
+function stopListeningSound() {
+  if (listeningVoices.length === 0) return;
+  const now = getAudioContext().currentTime;
+  for (const { source, env } of listeningVoices) {
+    env.gain.cancelScheduledValues(now);
+    env.gain.setTargetAtTime(0, now, 0.02);
+    try {
+      source.stop(now + 0.12);
+    } catch {
+      // Already stopped by itself.
+    }
+  }
+  listeningVoices = [];
+}
+
+// Plays the question on the staff — or rather the one where a staff would be.
+// The recordings may still be on their way for the very first question, so the
+// phrase waits for them, and is dropped if the round has moved on meanwhile.
+function playListeningQuestion() {
+  const question = listeningQuestions[currentIndex];
+  if (!question) return;
+  stopListeningSound();
+
+  const { instrument, phrase, root } = question;
+  let at = 0;
+  const notes = phrase.map(([semitones, beats]) => {
+    const note = {
+      freq: 440 * 2 ** ((root + semitones - 69) / 12),
+      at,
+      length: beats * LISTENING_BEAT_SECONDS,
+    };
+    at += note.length;
+    return note;
+  });
+
+  if (!instrument.voice) {
+    listeningVoices = startTheremin(notes, 0.22);
+    return;
+  }
+  loadInstrument(instrument.voice).then(() => {
+    const current = listeningQuestions[currentIndex];
+    if (current !== question || !gameActive || gameMode !== "listening") return;
+    stopListeningSound();
+    listeningVoices = notes
+      .map((note) =>
+        startSample(
+          instrument.voice,
+          note.freq,
+          instrument.held ? note.length : note.length + LISTENING_RING_SECONDS,
+          note.at,
+          0.5,
+        ),
+      )
+      .filter(Boolean);
+  });
+}
+
+// How long a right answer stays lit before the next instrument is heard: long
+// enough to be seen as the answer, short enough not to be waited for.
+const LISTENING_HOLD_MS = 900;
+
+// The answer being held on screen, or null while a question is still open. The
+// same arrangement as the key game's hold: currentIndex does not move until it
+// is over, and any answer press cuts it short.
+let listeningHold = null;
+let listeningHoldTimer = null;
+
+function clearListeningHold() {
+  if (listeningHoldTimer !== null) clearTimeout(listeningHoldTimer);
+  listeningHoldTimer = null;
+  listeningHold = null;
+}
+
+function finishListeningHold() {
+  clearListeningHold();
+  currentIndex += 1;
+  updateStatus();
+  if (currentIndex >= totalNotes) {
+    stopListeningSound();
+    endGame();
+  } else {
+    renderListeningRound();
+    playListeningQuestion();
+  }
+}
+
+// The four answers. Rebuilt for every question and on a language change, since
+// each carries the instrument's name. The picture is decoration beside that
+// name as far as a screen reader is concerned, so its alt is empty.
+function renderListeningChoices() {
+  const question = listeningQuestions[currentIndex];
+  listeningOptionsEl.replaceChildren();
+  if (!question) return;
+
+  for (const instrument of question.choices) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "listening-option";
+    btn.dataset.instrument = instrument.id;
+    if (listeningHold && listeningHold.instrument === instrument) {
+      btn.classList.add("correct");
+    }
+
+    const picture = document.createElement("img");
+    picture.className = "listening-option-picture";
+    picture.src = `images/${instrument.id}.avif`;
+    picture.alt = "";
+    picture.draggable = false;
+
+    const name = document.createElement("span");
+    name.className = "listening-option-name";
+    name.textContent = t(`listen.${instrument.id}`);
+
+    btn.append(picture, name);
+    listeningOptionsEl.appendChild(btn);
+  }
+}
+
+// Draws the question without sounding it: this is what a theme or language
+// change calls, and neither should play the phrase again.
+function renderListeningRound() {
+  ensureListeningQuestion(currentIndex);
+  // The one after it too, so its recordings are in by the time it is asked.
+  if (currentIndex + 1 < totalNotes) ensureListeningQuestion(currentIndex + 1);
+  renderListeningChoices();
+}
+
+// Mirrors handleKeyGuess: a wrong answer is counted and costs the streak, but
+// the question stays until it is answered.
+function handleListeningGuess(instrumentId) {
+  if (!gameActive || gameMode !== "listening") return;
+
+  if (listeningHold) {
+    finishListeningHold();
+    return;
+  }
+
+  const question = listeningQuestions[currentIndex];
+  if (!question) return;
+
+  if (instrumentId === question.instrument.id) {
+    correct += 1;
+    streak += 1;
+    triggerFeedback("correct", listeningStageEl);
+    updateStatus();
+    listeningHold = { instrument: question.instrument };
+    renderListeningChoices();
+    listeningHoldTimer = setTimeout(finishListeningHold, LISTENING_HOLD_MS);
+  } else {
+    playErrorTone();
+    wrong += 1;
+    streak = 0;
+    triggerFeedback("wrong", listeningStageEl);
+    updateStatus();
+    shake(
+      listeningOptionsEl.querySelector(`[data-instrument="${instrumentId}"]`),
+    );
+  }
+}
+
+function startListeningGame() {
+  clearListeningHold();
+  listeningQuestions = [];
+  currentIndex = 0;
+  correct = 0;
+  wrong = 0;
+  streak = 0;
+  // Every picture, asked for up front: a card whose picture arrives a moment
+  // after its name reads as a card that changed.
+  for (const instrument of LISTENING_INSTRUMENTS) {
+    new Image().src = `images/${instrument.id}.avif`;
+  }
+  renderListeningRound();
+  updateStatus();
+  playListeningQuestion();
+}
+
+listeningOptionsEl.addEventListener("click", (event) => {
+  const btn = event.target.closest("[data-instrument]");
+  if (!btn) return;
+  handleListeningGuess(btn.dataset.instrument);
+});
+
+listeningOptionsEl.addEventListener("animationend", (event) => {
+  event.target.classList.remove("wrong");
+});
+
+listeningReplayBtn.addEventListener("click", () => {
+  if (gameActive && gameMode === "listening" && !listeningHold) {
+    playListeningQuestion();
+  }
 });
 
 // --- Interval game ---
@@ -3448,6 +3898,9 @@ function showScreen(screen) {
   clearCardAdvance();
   clearIntervalWalk();
   clearKeyHold();
+  // And an instrument still playing stops: its question is no longer there.
+  clearListeningHold();
+  stopListeningSound();
   // One way out, in the same place on every screen. The menu is the one screen
   // there is nothing behind, so it is the one screen without it.
   toolbarBack.hidden = screen === menuScreen;
@@ -3460,6 +3913,7 @@ function showScreen(screen) {
     gameScreen,
     keysScreen,
     intervalsScreen,
+    listeningScreen,
     resultsScreen,
   ]) {
     s.hidden = s !== screen;
@@ -3481,6 +3935,7 @@ const SETUP_TITLE_KEYS = {
   notes: "setup.title",
   keys: "setup.titleKeys",
   intervals: "setup.titleIntervals",
+  listening: "setup.titleListening",
 };
 
 function showSetup(mode = gameMode) {
@@ -3527,6 +3982,12 @@ function beginGame(questionCount) {
   } else if (gameMode === "intervals") {
     showScreen(intervalsScreen);
     startIntervalsGame();
+  } else if (gameMode === "listening") {
+    showScreen(listeningScreen);
+    // Set before the round starts rather than after it, as below: the first
+    // phrase is played from in there and checks that a round is running.
+    gameActive = true;
+    startListeningGame();
   } else {
     showScreen(gameScreen);
     startGame();
@@ -3561,6 +4022,9 @@ function restartRound() {
     startKeysGame();
   } else if (gameMode === "intervals") {
     startIntervalsGame();
+  } else if (gameMode === "listening") {
+    // Nothing on this screen is written in a clef, so a new one changes
+    // nothing about the round.
   } else if (melodyRound) {
     // A clef too narrow for the tune leaves it unplaceable; the round carries
     // on as a run of that many random notes rather than stopping dead.
@@ -3580,6 +4044,8 @@ function redrawCurrentGame() {
     renderKeysRound();
   } else if (gameMode === "intervals") {
     renderIntervalNotation();
+  } else if (gameMode === "listening") {
+    renderListeningChoices();
   } else {
     renderNotation();
   }
@@ -3673,6 +4139,26 @@ window.addEventListener("keydown", (event) => {
     if (btn) handleKeyGuess(btn.dataset.key);
     return;
   }
+  // The listening game is answered like the key game, 1-4 along the options,
+  // and Space plays the phrase again — the one thing on its screen to repeat.
+  if (gameMode === "listening") {
+    if (event.key === " " && gameActive) {
+      event.preventDefault();
+      if (!listeningHold) playListeningQuestion();
+      return;
+    }
+    const choice = Number(event.key);
+    if (
+      !Number.isInteger(choice) ||
+      choice < 1 ||
+      choice > LISTENING_CHOICES
+    ) {
+      return;
+    }
+    const btn = listeningOptionsEl.children[choice - 1];
+    if (btn) handleListeningGuess(btn.dataset.instrument);
+    return;
+  }
   // The interval game is answered by the interval's own number — 5 for a
   // kvintti — which is why its pad never reshuffles: the key and the button
   // say the same thing, and both say it in the same place every time.
@@ -3744,6 +4230,9 @@ document
 document
   .getElementById("menu-intervals")
   .addEventListener("click", () => showSetup("intervals"));
+document
+  .getElementById("menu-listening")
+  .addEventListener("click", () => showSetup("listening"));
 document
   .getElementById("menu-cards")
   .addEventListener("click", () => showCards("notes"));

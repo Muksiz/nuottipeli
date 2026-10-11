@@ -172,7 +172,10 @@
               </span>
             </button>
           </section>
-          <section class="menu-group" aria-labelledby="menu-group-intervals">
+          <section
+            class="menu-group menu-group-upper"
+            aria-labelledby="menu-group-intervals"
+          >
             <h2 class="menu-group-heading" id="menu-group-intervals" data-i18n="menu.groupIntervals">
               Intervallit
             </h2>
@@ -182,6 +185,27 @@
                 <span class="menu-name" data-i18n="menu.intervals">Tunnista intervalli</span>
                 <span class="menu-note" data-i18n="menu.intervalsNote">
                   Nimeä kahden nuotin väli.
+                </span>
+              </span>
+            </button>
+          </section>
+          <section
+            class="menu-group menu-group-lower"
+            aria-labelledby="menu-group-instruments"
+          >
+            <h2
+              class="menu-group-heading"
+              id="menu-group-instruments"
+              data-i18n="menu.groupInstruments"
+            >
+              Soittimet
+            </h2>
+            <button type="button" class="menu-item" id="menu-listening">
+              <span class="menu-icon" aria-hidden="true">♫</span>
+              <span class="menu-text">
+                <span class="menu-name" data-i18n="menu.listening">Tunnista soitin</span>
+                <span class="menu-note" data-i18n="menu.listeningNote">
+                  Kuuntele ja valitse oikea soitin.
                 </span>
               </span>
             </button>
@@ -380,6 +404,39 @@
           <div class="status-row">
             <span data-i18n="game.streak">Putki</span>
             <strong id="intervals-streak">0</strong>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen game listening-screen" id="listening-screen" hidden>
+        <div class="progress" id="listening-progress"></div>
+        <div class="notation-area listening-stage" id="listening-stage">
+          <button type="button" class="listening-replay" id="listening-replay">
+            <span class="listening-replay-icon" aria-hidden="true">▶</span>
+            <span data-i18n="listening.replay">Kuuntele uudelleen</span>
+          </button>
+        </div>
+        <p class="game-prompt" id="listening-prompt" data-i18n="listening.prompt">
+          Mikä soitin?
+        </p>
+        <div
+          class="listening-options"
+          id="listening-options"
+          role="group"
+          aria-labelledby="listening-prompt"
+        ></div>
+        <div class="status">
+          <div class="status-row">
+            <span data-i18n="game.correct">Oikein</span>
+            <strong id="listening-score">0</strong>
+          </div>
+          <div class="status-row">
+            <span data-i18n="game.wrong">Väärin</span>
+            <strong id="listening-mistakes">0</strong>
+          </div>
+          <div class="status-row">
+            <span data-i18n="game.streak">Putki</span>
+            <strong id="listening-streak">0</strong>
           </div>
         </div>
       </section>

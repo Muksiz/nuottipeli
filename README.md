@@ -2,8 +2,9 @@
 
 A note reading trainer in Finnish and Swedish. Notes appear on a staff and you
 name them by pressing the letter key — the Nordic way, so B is `h`. There is a
-second game for key signatures, card decks and reference charts for both, and
-seven out-of-copyright melodies to read instead of a plain count of notes.
+second game for key signatures, a third for intervals and a fourth for telling
+instruments apart by ear, card decks and reference charts, and seven
+out-of-copyright melodies to read instead of a plain count of notes.
 
 ## Running it
 
@@ -16,8 +17,12 @@ plays a synthesised tone instead. `vite .` or any static file server will do.
 
 ## Credits
 
-The piano, guitar and clarinet notes are from the FluidR3_GM soundfont by Frank
-Wen, licensed CC BY 3.0. See `sounds/README.md`.
+Every recorded note is from the FluidR3_GM soundfont by Frank Wen, licensed
+CC BY 3.0. See `sounds/README.md`.
+
+The instrument photographs are from Wikimedia Commons, each under its own
+licence — public domain, CC BY or CC BY-SA. `images/README.md` lists every
+one with its author, source and licence.
 
 Notation is drawn by [VexFlow](https://www.vexflow.com) (MIT, `vendor/`). The
 typefaces are DM Sans and DM Serif Display (SIL OFL 1.1, `fonts/`).
