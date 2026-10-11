@@ -10,13 +10,15 @@ Nuottipeli ("note game") is a music note recognition trainer. It displays notes 
 
 No build step, no package manager. Open `index.html` in a browser to run — though the instrument recordings in `sounds/` are fetched, which a browser only allows over HTTP, so off the disk the app falls back to its synthesised tone; `vite . --port 3000 --host` is what is used in development. The entire app is three files plus those recordings:
 
-- `index.html` — markup, loads VexFlow from CDN
+- `index.html` — markup, loads VexFlow from `vendor/vexflow.js`
 - `script.js` — game logic, audio synthesis, theme system
 - `styles.css` — themes (via CSS custom properties + `data-theme` attribute), layout, animations
 
 ## Architecture
 
-**Notation rendering**: Uses VexFlow 4.2.5 (CDN) to draw notes on an SVG staff. The visible window scrolls forward as the player progresses, keeping a few past notes visible for context (`CONTEXT_BEHIND`). Note colors (past/current/future) come from CSS custom properties read at render time.
+**No CDN**: nothing is loaded from another server. VexFlow is vendored as `vendor/vexflow.js` (the unmodified 4.2.5 `cjs` build, MIT) and the two typefaces, DM Sans and DM Serif Display (OFL), are in `fonts/` with their `@font-face` rules at the top of `styles.css`. Each folder has a README saying where its files came from and under what licence; the licence texts sit beside them, which both licences ask for.
+
+**Notation rendering**: Uses VexFlow 4.2.5 (vendored) to draw notes on an SVG staff. The visible window scrolls forward as the player progresses, keeping a few past notes visible for context (`CONTEXT_BEHIND`). Note colors (past/current/future) come from CSS custom properties read at render time.
 
 **Audio**: Web Audio API throughout. Notes are played off recordings of the instrument picked in the settings — `INSTRUMENTS`: piano (the default), acoustic guitar, clarinet — kept under `"instrument"` in `localStorage`. The recordings are per-note MP3s in `sounds/<id>/` from the FluidR3_GM soundfont (CC BY 3.0, credited in `sounds/README.md` and the README, which the licence requires). Only every third semitone is there, A1 through Es6 — 19 files an instrument, covering everything the clefs, the key chords and an altered interval can ask for — and `playSample()` plays the nearest one a semitone fast or slow at most. `loadInstrument()` fetches and decodes a set once (on an `OfflineAudioContext`, so loading at startup does not open the real context before a gesture) and `sampleOnset()` finds where each recording actually starts, since an mp3 opens with a little silence that would put a note behind its picture. Everything still goes through `playTone(freq, duration, delay, gain)`, which tries the recordings and otherwise synthesises the note — layered sine oscillators with an exponential decay, the app's original sound — so the first note before a set has loaded, a failed download, and a page opened off the disk all still make a sound. Each instrument has a `level` (the recordings are quiet and not equally so) and a `sustain`: a clarinet holds its note where a piano's dies away, so it is given only part of the asked-for length or the interval climb's rungs smear together. The picker is `#instrument-menu`, under the language list in the settings dialog's first column and sharing `.lang-menu`'s rules; `applyInstrument()` answers a pick with a note once the set is in. Instrument names are translated (`instrument.<id>`). Error feedback is still a synthesised dissonant sawtooth pair whatever the instrument.
 
