@@ -2133,24 +2133,14 @@ function makeIntervalQuestion() {
   return { size, ladder, tonic, key, top };
 }
 
-// The most accidentals a signature may carry when its tonic is itself a
-// flattened or sharpened note.
-const INTERVAL_ALTERED_KEY_LIMIT = 6;
-
 // The major keys a lower note written on `letter` may be the tonic of. The
 // pool only has naturals, but the signature is what spells the tonic: a note
 // on the h line under two flats *is* a b, with nothing written beside it. So
-// the natural's own key is always on offer, however many accidentals it takes
-// (H major has five), and beside it whichever altered tonics stay within
-// INTERVAL_ALTERED_KEY_LIMIT — which today means B, Es, As, Des, Ges and Fis,
-// leaving out only the two keys of seven, Ces and Cis.
+// every key whose tonic is written on that letter is on offer — the natural's
+// own, and the flattened and sharpened ones beside it — all the way out to the
+// two keys of seven, Ces and Cis.
 function intervalKeysFor(letter) {
-  return KEYS.filter(
-    (key) =>
-      key.vf[0].toLowerCase() === letter &&
-      (key.vf.length === 1 ||
-        Math.abs(key.accidentals) <= INTERVAL_ALTERED_KEY_LIMIT),
-  );
+  return KEYS.filter((key) => key.vf[0].toLowerCase() === letter);
 }
 
 // Which letters a signature alters, in the order it adds them.
@@ -2306,7 +2296,7 @@ function renderIntervalNotation() {
 
   // How much room the clef and the signature take, measured off a stave that
   // is never drawn — the clefs are not all the same width and a signature runs
-  // from nothing (C) to five sharps (H), and the notes start wherever they end.
+  // from nothing (C) to seven (Ces, Cis), and the notes start wherever they end.
   const question = intervalWalk
     ? intervalWalk.question
     : intervalQuestions[currentIndex];
