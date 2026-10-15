@@ -1232,7 +1232,7 @@ body {
 /* The interval game's choice of intervals borrows the same pill on the
    round-length picker. It sets a display of its own, so hiding it on the other
    two games' pickers has to be spelled out; and its labels are long enough to
-   need a phone's whole width, so the two halves share it and wrap inside. */
+   need a phone's whole width, so the three choices share it and wrap inside. */
 .interval-scale[hidden] {
   display: none;
 }

@@ -365,6 +365,7 @@ const STRINGS = {
     "intervals.scale": "Intervallien valikoima",
     "intervals.scaleMajor": "Duuriasteikkoiset intervallit",
     "intervals.scaleAll": "Kaikki intervallit",
+    "intervals.scaleSuper": "Supertiet\u00e4j\u00e4",
     "interval.1": "priimi",
     "interval.2": "sekunti",
     "interval.3": "terssi",
@@ -484,6 +485,7 @@ const STRINGS = {
     "intervals.scale": "Urval av intervall",
     "intervals.scaleMajor": "Durskalans intervall",
     "intervals.scaleAll": "Alla intervall",
+    "intervals.scaleSuper": "Supervetare",
     "interval.1": "prim",
     "interval.2": "sekund",
     "interval.3": "ters",
@@ -2012,10 +2014,23 @@ const INTERVAL_SIZES = [1, 2, 3, 4, 5, 6, 7, 8];
 // perfect one. "all" keeps the signature and puts an accidental of its own on
 // the upper note as often as not, which lets the minor, diminished and
 // augmented ones in — e to g under four sharps is a suuri terssi, and a pieni
-// one once the g wears a natural.
+// one once the g wears a natural. "super" — Supertietäjä — asks what "all"
+// asks but takes the signature away: every note wears the accidental it needs
+// in front of it instead, so the key has to be worked out from the notes
+// rather than read off the start of the staff.
 const INTERVAL_SCALE_STORAGE_KEY = "intervalScale";
-let intervalScale =
-  localStorage.getItem(INTERVAL_SCALE_STORAGE_KEY) === "all" ? "all" : "major";
+const INTERVAL_SCALES = ["major", "all", "super"];
+let intervalScale = INTERVAL_SCALES.includes(
+  localStorage.getItem(INTERVAL_SCALE_STORAGE_KEY),
+)
+  ? localStorage.getItem(INTERVAL_SCALE_STORAGE_KEY)
+  : "major";
+
+// Whether a round asks for the quality as well as the number: every round but
+// a major-scale one, where each size has only the one.
+function intervalAsksQuality() {
+  return intervalScale !== "major";
+}
 
 function markIntervalScale() {
   intervalScaleEl.querySelectorAll("[data-scale]").forEach((btn) => {
@@ -2126,11 +2141,13 @@ function makeIntervalQuestion() {
   const key = keys[Math.floor(Math.random() * keys.length)];
   // The upper note's own accidental, where the round has them. The question
   // carries it, so one already dealt keeps reading and sounding as posed.
-  const top =
-    intervalScale === "all"
-      ? randomTopAccidental(key, ladder.at(-1), size)
-      : { sign: null, alter: 0 };
-  return { size, ladder, tonic, key, top };
+  const top = intervalAsksQuality()
+    ? randomTopAccidental(key, ladder.at(-1), size)
+    : { sign: null, alter: 0 };
+  // A Supertietäjä question is written without its signature, and carries
+  // that too, so a redraw after the setting changes still draws it as dealt.
+  const bare = intervalScale === "super";
+  return { size, ladder, tonic, key, top, bare };
 }
 
 // The major keys a lower note written on `letter` may be the tonic of. The
@@ -2303,7 +2320,7 @@ function renderIntervalNotation() {
 
   const probe = new Stave(0, 0, available);
   probe.addClef(currentClef.id);
-  if (question?.key) probe.addKeySignature(question.key.vf);
+  if (question?.key && !question.bare) probe.addKeySignature(question.key.vf);
   probe.setContext(context);
   const noteStart = probe.getNoteStartX();
   const staveWidth = Math.min(
@@ -2315,7 +2332,7 @@ function renderIntervalNotation() {
   const stave = new Stave(10, 30, staveWidth);
   stave.addClef(currentClef.id);
   // The lower note's major scale, so the two notes read as degrees of it.
-  if (question?.key) stave.addKeySignature(question.key.vf);
+  if (question?.key && !question.bare) stave.addKeySignature(question.key.vf);
   // Same reason as the note game's: VexFlow's default ledger grey vanishes on
   // the dark themes.
   stave.setDefaultLedgerLineStyle({
@@ -2352,7 +2369,10 @@ function renderIntervalNotation() {
   // on the way are plain degrees of the scale.
   const atTop =
     !intervalWalk || intervalWalk.step === question.ladder.length - 1;
-  const topSign = atTop ? question.top.sign : null;
+  const signs = [
+    intervalNoteSign(question, question.ladder[0], false),
+    intervalNoteSign(question, climbing, atTop),
+  ];
 
   const color = styles.getPropertyValue("--note-current").trim();
   const staveNotes = [question.ladder[0], climbing].map((note, i) => {
@@ -2365,8 +2385,8 @@ function renderIntervalNotation() {
       stem_direction: stemDown ? -1 : 1,
     });
     sn.setStyle({ fillStyle: color, strokeStyle: color });
-    if (i === 1 && topSign) {
-      const accidental = new Accidental(topSign);
+    if (signs[i]) {
+      const accidental = new Accidental(signs[i]);
       accidental.setStyle({ fillStyle: color, strokeStyle: color });
       sn.addModifier(accidental, 0);
       // Formatting is what moves an accidental clear of its notehead, and with
@@ -2387,6 +2407,23 @@ function renderIntervalNotation() {
   if (intervalWalk) {
     drawIntervalCount(context, stave, staveNotes[1].getAbsoluteX(), intervalWalk);
   }
+}
+
+// The accidental written in front of a note of the question, or null for none.
+// Under a signature only the upper note's own one is written, and only once
+// the note is back where it was written. With no signature — a Supertietäjä
+// question — every note wears whatever the signature would have done to it,
+// and the upper one its own accidental on top of that; which is never more
+// than a sharp or a flat, since randomTopAccidental keeps the upper note
+// within a semitone of the natural.
+const SIGNS_BY_ALTERATION = { "-1": "b", 0: null, 1: "#" };
+
+function intervalNoteSign(question, note, atTop) {
+  if (!question.bare) return atTop ? question.top.sign : null;
+  const alter =
+    signatureAlteration(question.key, note.key[0]) +
+    (atTop ? question.top.alter : 0);
+  return SIGNS_BY_ALTERATION[alter] ?? null;
 }
 
 // The quality picked for the question on the staff, or null before one is. In
@@ -2418,7 +2455,7 @@ function pickIntervalQuality(quality) {
 // major-scale one each size has one quality and the pad already names it.
 function buildIntervalQualities() {
   intervalQualitiesEl.replaceChildren();
-  intervalQualitiesEl.hidden = intervalScale !== "all";
+  intervalQualitiesEl.hidden = !intervalAsksQuality();
   for (const quality of INTERVAL_QUALITIES) {
     const btn = document.createElement("button");
     btn.type = "button";
@@ -2584,7 +2621,7 @@ function handleIntervalGuess(size) {
   // A round of all the intervals is answered in two halves, and a number with
   // no quality picked is half an answer: it is pointed back at the row above
   // rather than counted, since nothing has been got wrong yet.
-  const needsQuality = intervalScale === "all";
+  const needsQuality = intervalAsksQuality();
   if (needsQuality && pickedIntervalQuality === null) {
     shake(intervalQualitiesEl, "nudge");
     return;
@@ -3320,7 +3357,7 @@ window.addEventListener("keydown", (event) => {
     // The qualities have no numbers of their own to be typed, the digits
     // being taken, so the arrows walk the pick along the row instead.
     if (
-      intervalScale === "all" &&
+      intervalAsksQuality() &&
       (event.key === "ArrowLeft" || event.key === "ArrowRight")
     ) {
       event.preventDefault();
