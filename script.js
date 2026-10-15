@@ -276,10 +276,10 @@ function playErrorTone(duration = 0.35) {
 // The round-length picker offers a handful of rounds that are a tune rather
 // than a number. Each one is written as offsets in diatonic steps from the
 // note it opens on, paired with that note's length in beats: the offsets place
-// the tune in whatever clef is showing, and the beats are used only when the
-// finished tune is played back — the staff draws it as plain quarter notes
-// like every other round. An offset of `null` is a rest: it keeps its place in
-// the playback and is not a note to name, so it never reaches the staff.
+// the tune in whatever clef is showing. The beats are kept as a record of the
+// tune but nothing reads them — the staff draws it as plain quarter notes like
+// every other round, and the finished tune is not played back. An offset of
+// `null` is a rest: it is not a note to name, so it never reaches the staff.
 //
 // A tune can only be moved by whole octaves. Every note here is a natural and
 // no clef's pool has accidentals, so shifting one by anything else would
@@ -407,11 +407,6 @@ const MELODIES = [
     ],
   },
 ];
-
-// Seconds to a beat, and the pause before the played-back tune starts — long
-// enough that the note the last answer sounded has died away first.
-const MELODY_BEAT_SECONDS = 0.45;
-const MELODY_LEAD_IN_SECONDS = 0.7;
 
 function findMelody(id) {
   return MELODIES.find((melody) => melody.id === id) ?? null;
@@ -1126,25 +1121,6 @@ function melodyNotes(clef, melody) {
 // pool is too narrow for a tune simply does not offer it.
 function availableMelodies(clef) {
   return MELODIES.filter((melody) => melodyNotes(clef, melody).length > 0);
-}
-
-// The reward for finishing: the whole tune, in time, from the beginning. Every
-// note is scheduled on the audio clock in one go rather than chased with
-// timers, so nothing drifts — a rest is silence that still takes its beats.
-function playMelody(entries) {
-  let beat = 0;
-  for (const { note, beats } of entries) {
-    const seconds = beats * MELODY_BEAT_SECONDS;
-    if (note) {
-      playPianoNote(
-        note.key,
-        // A shade under its own length, so repeated notes are heard as two.
-        Math.max(0.3, seconds * 0.9),
-        MELODY_LEAD_IN_SECONDS + beat * MELODY_BEAT_SECONDS,
-      );
-    }
-    beat += beats;
-  }
 }
 
 function getVisibleCount() {
@@ -4125,8 +4101,6 @@ function renderResults(accuracy) {
 function endGame() {
   gameActive = false;
   markPlayed(gameMode, melodyRound ? melodyRound.melody.id : totalNotes);
-  // Every note of it has now been named; the reward is hearing what they were.
-  if (melodyRound) playMelody(melodyRound.entries);
 
   const total = correct + wrong;
   lastAccuracy = total > 0 ? Math.round((correct / total) * 100) : 0;
