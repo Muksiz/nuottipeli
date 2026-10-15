@@ -1,6 +1,9 @@
 {
   "name": "nuottipeli",
   "compatibility_date": "2026-08-23",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [{ "pattern": "nuottipeli.janix.fi", "custom_domain": true }],
   "assets": {
     "directory": "./"
   }

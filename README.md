@@ -31,6 +31,8 @@ typefaces are DM Sans and DM Serif Display (SIL OFL 1.1, `fonts/`).
 
 Pushes to `main` deploy to Cloudflare as a static-asset Worker; `wrangler.jsonc`
 serves the repo root and `.assetsignore` keeps everything that is not the site
-out of the upload.
+out of the upload. It is served at `nuottipeli.janix.fi` only: the config
+turns the `workers.dev` addresses off, since wrangler turns them on when the
+setting is absent.
 
 CI/CD test
