@@ -2415,15 +2415,25 @@ function renderIntervalNotation() {
 // question — every note wears whatever the signature would have done to it,
 // and the upper one its own accidental on top of that; which is never more
 // than a sharp or a flat, since randomTopAccidental keeps the upper note
-// within a semitone of the natural.
+// within a semitone of the natural. An accidental holds for the rest of the
+// bar, so an upper note on the lower one's letter — a priimi, or an oktaavi as
+// a reminder — that is back to the plain natural gets a natural sign in front
+// of it: the a over an as is written ♮a.
 const SIGNS_BY_ALTERATION = { "-1": "b", 0: null, 1: "#" };
 
 function intervalNoteSign(question, note, atTop) {
   if (!question.bare) return atTop ? question.top.sign : null;
+  const letter = note.key[0];
   const alter =
-    signatureAlteration(question.key, note.key[0]) +
+    signatureAlteration(question.key, letter) +
     (atTop ? question.top.alter : 0);
-  return SIGNS_BY_ALTERATION[alter] ?? null;
+  const sign = SIGNS_BY_ALTERATION[alter] ?? null;
+  const cancels =
+    atTop &&
+    !sign &&
+    letter === question.tonic.key[0] &&
+    signatureAlteration(question.key, letter) !== 0;
+  return cancels ? "n" : sign;
 }
 
 // The quality picked for the question on the staff, or null before one is. In
