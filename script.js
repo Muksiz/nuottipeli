@@ -2752,7 +2752,11 @@ const INTERVAL_SIZES = [1, 2, 3, 4, 5, 6, 7, 8];
 // one once the g wears a natural. "super" — Supertietäjä — asks what "all"
 // asks but takes the signature away: every note wears the accidental it needs
 // in front of it instead, so the key has to be worked out from the notes
-// rather than read off the start of the staff.
+// rather than read off the start of the staff. With no signature to spell it,
+// the lower note is free to be any of the 21 single sharps, flats and naturals
+// — dis, eis, fes, gis, ais and his too, the roots whose major scale no
+// signature holds — so long as the upper note still needs no double sharp or
+// flat.
 const INTERVAL_SCALE_STORAGE_KEY = "intervalScale";
 const INTERVAL_SCALES = ["major", "all", "super"];
 let intervalScale = INTERVAL_SCALES.includes(
@@ -2872,17 +2876,50 @@ function makeIntervalQuestion() {
   const ladder = pool.slice(bottom, bottom + size);
   // The lower note is the tonic of the scale the staff is signed in.
   const tonic = ladder[0];
-  const keys = intervalKeysFor(tonic.key[0]);
-  const key = keys[Math.floor(Math.random() * keys.length)];
-  // The upper note's own accidental, where the round has them. The question
-  // carries it, so one already dealt keeps reading and sounding as posed.
-  const top = intervalAsksQuality()
-    ? randomTopAccidental(key, ladder.at(-1), size)
-    : { sign: null, alter: 0 };
   // A Supertietäjä question is written without its signature, and carries
   // that too, so a redraw after the setting changes still draws it as dealt.
   const bare = intervalScale === "super";
-  return { size, ladder, tonic, key, top, bare };
+  // How far the tonic stands off the natural it is written on. Under a
+  // signature that is the signature's doing, so the key is drawn and the
+  // tonic follows from it; on a bare staff there is no key to draw, and the
+  // tonic is simply flat, natural or sharp.
+  let key = null;
+  let rootAlter;
+  if (bare) {
+    rootAlter = Math.floor(Math.random() * 3) - 1;
+  } else {
+    const keys = intervalKeysFor(tonic.key[0]);
+    key = keys[Math.floor(Math.random() * keys.length)];
+    rootAlter = signatureAlteration(key, tonic.key[0]);
+  }
+  const question = { size, ladder, tonic, key, rootAlter, bare };
+  // The upper note's own accidental, where the round has them. The question
+  // carries it, so one already dealt keeps reading and sounding as posed.
+  question.top = intervalAsksQuality()
+    ? randomTopAccidental(scaleAlteration(question, ladder.at(-1)), size)
+    : { sign: null, alter: 0 };
+  return question;
+}
+
+// How far a note of the question stands off its natural as a degree of the
+// tonic's major scale. Under a signature that is just what the signature does
+// to its letter. On a bare staff it is worked out from the tonic: the major
+// scale's step above it, less the step the two naturals already are apart —
+// over a dis, the terssi is fisis, two above the f. Only the upper note is
+// ever written at this, and randomTopAccidental moves it back where that is
+// more than a sharp or a flat.
+function scaleAlteration(question, note) {
+  if (!question.bare) return signatureAlteration(question.key, note.key[0]);
+  const degree = diatonicStep(note.key) - diatonicStep(question.tonic.key);
+  const naturalGap =
+    naturalSemitone(note.key) - naturalSemitone(question.tonic.key);
+  return question.rootAlter + MAJOR_SCALE[degree] - naturalGap;
+}
+
+// A natural note in semitones above the C of octave 0.
+function naturalSemitone(noteKey) {
+  const [letter, octave] = noteKey.split("/");
+  return parseInt(octave, 10) * 12 + SEMITONE_FROM_C[letter];
 }
 
 // The major keys a lower note written on `letter` may be the tonic of. The
@@ -2930,9 +2967,12 @@ const TOP_ACCIDENTALS = [
 // note would want a double sharp or flat, and a perfect interval moved two
 // ways is a doubly diminished one, which is a spelling exercise rather than a
 // count. A priimi is never lowered, since that would put the "upper" note
-// underneath the one whose scale the staff is signed in.
-function randomTopAccidental(key, note, size) {
-  const signed = signatureAlteration(key, note.key[0]);
+// underneath the one whose scale the staff is signed in. `signed` is where
+// the scale puts the note, which over one of the bare staff's roots can be a
+// double sharp or flat itself — the terssi over dis is fisis — and then the
+// only pick written with a single sign is the one a semitone back: fis, and
+// a pieni terssi.
+function randomTopAccidental(signed, size) {
   const options = TOP_ACCIDENTALS.map(({ sign, pitch }) => ({
     sign: pitch === signed ? null : sign,
     alter: pitch - signed,
@@ -2942,29 +2982,31 @@ function randomTopAccidental(key, note, size) {
   return options[Math.floor(Math.random() * options.length)];
 }
 
-// What a note of the question sounds like under its signature: the degree of
-// the tonic's major scale it sits on, rather than the natural its notehead
-// would be on a bare staff — a g over e is a gis once the staff says E major.
-// Counted in semitones off the tonic for the reason the triads are: the
-// spelling is the staff's business, the sound is what is wanted here.
-function intervalFrequency(question, note) {
-  const degree = diatonicStep(note.key) - diatonicStep(question.tonic.key);
-  // The tonic as the signature spells it: the written natural, moved by
-  // whatever the signature does to its own letter.
-  const tonicShift = signatureAlteration(question.key, question.tonic.key[0]);
+// How far a note of the question, as it is written and heard, stands off the
+// natural its notehead sits on: the degree of the tonic's major scale — a g
+// over e is a gis once the staff says E major — and, for the upper note back
+// in its place, its own accidental on top. A rung of the climb over one of the
+// bare staff's roots can be a degree the scale would double-sharpen or
+// double-flatten, the fisis and cisis of Dis major; it is written and sounded
+// a single sharp or flat instead, since the rungs are there to be counted and
+// the question itself never asks for a double either.
+function intervalNoteAlteration(question, note, atTop) {
+  const alter =
+    scaleAlteration(question, note) + (atTop ? question.top.alter : 0);
+  return question.bare ? Math.max(-1, Math.min(1, alter)) : alter;
+}
+
+function intervalFrequency(question, note, atTop = false) {
   return (
-    noteFrequency(question.tonic.key) *
-    2 ** ((tonicShift + MAJOR_SCALE[degree]) / 12)
+    noteFrequency(note.key) *
+    2 ** (intervalNoteAlteration(question, note, atTop) / 12)
   );
 }
 
 // The upper note as it is written: its scale degree, moved by whatever
 // accidental of its own it carries.
 function intervalTopFrequency(question) {
-  return (
-    intervalFrequency(question, question.ladder.at(-1)) *
-    2 ** (question.top.alter / 12)
-  );
+  return intervalFrequency(question, question.ladder.at(-1), true);
 }
 
 // One entry per question, built on demand and kept: a question the player is
@@ -3147,18 +3189,15 @@ function renderIntervalNotation() {
 // The accidental written in front of a note of the question, or null for none.
 // Under a signature only the upper note's own one is written, and only once
 // the note is back where it was written. With no signature — a Supertietäjä
-// question — every note wears whatever the signature would have done to it,
-// and the upper one its own accidental on top of that; which is never more
-// than a sharp or a flat, since randomTopAccidental keeps the upper note
-// within a semitone of the natural.
+// question — every note wears its degree of the tonic's scale, and the upper
+// one its own accidental on top of that; which is never more than a sharp or
+// a flat, since randomTopAccidental keeps the upper note within a semitone of
+// the natural and intervalNoteAlteration keeps the rungs there.
 const SIGNS_BY_ALTERATION = { "-1": "b", 0: null, 1: "#" };
 
 function intervalNoteSign(question, note, atTop) {
   if (!question.bare) return atTop ? question.top.sign : null;
-  const alter =
-    signatureAlteration(question.key, note.key[0]) +
-    (atTop ? question.top.alter : 0);
-  return SIGNS_BY_ALTERATION[alter] ?? null;
+  return SIGNS_BY_ALTERATION[intervalNoteAlteration(question, note, atTop)];
 }
 
 // The quality picked for the question on the staff, or null before one is. In
