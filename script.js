@@ -3183,6 +3183,9 @@ function markIntervalQuality() {
     const active = btn.dataset.quality === pickedIntervalQuality;
     btn.classList.toggle("active", active);
     btn.setAttribute("aria-checked", String(active));
+    // A shake from an earlier wrong answer is over by the time anything is
+    // picked again; with reduced motion it never ran, so nothing else clears it.
+    btn.classList.remove("wrong");
   });
 }
 
@@ -3216,6 +3219,12 @@ function buildIntervalQualities() {
 intervalQualitiesEl.addEventListener("click", (event) => {
   const btn = event.target.closest("[data-quality]");
   if (btn) pickIntervalQuality(btn.dataset.quality);
+});
+
+// The row's own nudge stays lit until a quality is picked, so only a button's
+// shake is let go of here — the same as the pad's.
+intervalQualitiesEl.addEventListener("animationend", (event) => {
+  if (event.target.dataset.quality) event.target.classList.remove("wrong");
 });
 
 // Restarts an element's shake, for a second wrong press on the same thing.
