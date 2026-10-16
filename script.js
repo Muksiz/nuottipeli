@@ -2683,18 +2683,18 @@ function handleIntervalGuess(size) {
     triggerFeedback("wrong", intervalsNotationEl);
     updateStatus();
     // One mistake however many halves were wrong, but each wrong half shakes,
-    // so it is plain which one to think again about. A wrong quality is also
-    // let go of; a right one stays picked for the next try at the number.
+    // so it is plain which one to think again about. The quality is let go of
+    // either way, so the next try starts with both halves to answer afresh.
     if (!sizeRight) {
       shake(intervalOptionsEl.querySelector(`[data-interval="${size}"]`));
     }
-    if (!qualityRight) {
+    if (needsQuality) {
       const missed = intervalQualitiesEl.querySelector(
         `[data-quality="${pickedIntervalQuality}"]`,
       );
       pickedIntervalQuality = null;
       markIntervalQuality();
-      shake(missed);
+      if (!qualityRight) shake(missed);
     }
   }
 }
