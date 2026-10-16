@@ -726,6 +726,13 @@ body {
   color: var(--status-value);
 }
 
+.setup-group {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  justify-items: center;
+}
+
 /* --- Note range settings --- */
 
 .settings-panel {
@@ -945,6 +952,25 @@ body {
   align-content: start;
 }
 
+/* The third column holds two subjects with a game each, one above the other,
+   rather than a fourth column the card has no room for: intervals in the top
+   two rows, instruments in the bottom two. The lower heading lands in a row as
+   tall as the entries beside it, so it is set against the entry it belongs to
+   rather than left floating at the top of that row. */
+.menu-group-upper {
+  grid-column: 3;
+  grid-row: 1 / 3;
+}
+
+.menu-group-lower {
+  grid-column: 3;
+  grid-row: 3 / -1;
+}
+
+.menu-group-lower .menu-group-heading {
+  align-self: end;
+}
+
 /* Three columns inside the 720px card leave each about 210px — close to what
    two of them came to on the narrowest screen that still showed two, so the
    entries read the same. Below that they stack, headings and all. */
@@ -959,6 +985,7 @@ body {
   }
 
   .menu-group {
+    grid-column: auto;
     grid-row: auto;
     grid-template-rows: none;
   }
@@ -1444,6 +1471,119 @@ body {
   color: var(--note-current);
 }
 
+/* The listening game. Where the other games have a staff it has the one thing
+   there is to do before answering — hear it again — in the same framed area,
+   so the screen keeps the games' shape and the feedback animations have the
+   same thing to act on. */
+.listening-stage {
+  display: grid;
+  place-items: center;
+  min-height: 120px;
+}
+
+.listening-replay {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font: inherit;
+  font-weight: 600;
+  padding: 14px 22px;
+  background: var(--toggle-bg);
+  border: 1px solid var(--toggle-border);
+  border-radius: 999px;
+  color: var(--status-value);
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.listening-replay:hover {
+  transform: translateY(-2px);
+  border-color: var(--note-current);
+  color: var(--note-current);
+}
+
+.listening-replay:focus-visible {
+  outline: 2px solid var(--note-current);
+  outline-offset: 2px;
+}
+
+.listening-replay-icon {
+  color: var(--note-current);
+}
+
+/* Four answers, each a picture over a name. The pictures are photographs of
+   every shape — a flute is five times as wide as a tuba — so each sits whole
+   inside a square of its own, on white whatever the theme: most were shot on
+   white, and a photograph's own background is not the palette's to recolour. */
+.listening-options {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  width: 100%;
+}
+
+.listening-option {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  font: inherit;
+  padding: 8px 8px 10px;
+  background: var(--toggle-bg);
+  border: 1px solid var(--toggle-border);
+  border-radius: 12px;
+  color: var(--status-value);
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.listening-option:hover {
+  transform: translateY(-2px);
+  border-color: var(--note-current);
+  color: var(--note-current);
+}
+
+.listening-option:active {
+  transform: translateY(0);
+}
+
+.listening-option:focus-visible {
+  outline: 2px solid var(--note-current);
+  outline-offset: 2px;
+}
+
+.listening-option-picture {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: contain;
+  padding: 6px;
+  background: #fff;
+  border-radius: 8px;
+}
+
+.listening-option-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.listening-option.wrong {
+  animation: wrong-shake 400ms ease;
+  border-color: var(--note-current);
+}
+
+.listening-option.correct {
+  animation: correct-pop 400ms ease;
+  border-color: var(--note-current);
+  color: var(--note-current);
+}
+
+/* Four across on a phone would leave each picture the size of a thumbnail. */
+@media (max-width: 560px) {
+  .listening-options {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
 /* The eight interval names, in their own order and never in any other: the
    answer is a count, not one of four things it might be, so the pad stays put
    and 5 is always in the same place. Four across on every screen — eight in a
@@ -1585,6 +1725,88 @@ body {
   }
 }
 
+/* Rounds of a fixed length like the numbers above them, but tunes rather than
+   numbers, so they get a block of their own under them. */
+.setup-melody {
+  display: grid;
+  gap: 10px;
+  width: 100%;
+  margin-top: 6px;
+}
+
+/* The one heading on the setup screen that is not the title, so it says what
+   the list under it is without competing with the question above it. */
+.setup-melody-title {
+  margin: 0;
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: 0.95rem;
+  font-weight: 400;
+  text-align: center;
+  color: var(--status-label);
+}
+
+/* The tunes are named, not numbered, so they need room to be read — as many
+   per row as fit a title, rather than a fixed count the way the numbers use. */
+.melody-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+.melody-btn {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  align-content: center;
+  justify-items: center;
+  width: 100%;
+  font-family: inherit;
+  padding: 12px 14px;
+  background: var(--toggle-bg);
+  border: 1px solid var(--toggle-border);
+  border-radius: 10px;
+  color: var(--status-value);
+  cursor: pointer;
+  transition: transform 0.12s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.melody-btn:hover {
+  transform: translateY(-2px);
+  border-color: var(--note-current);
+  color: var(--note-current);
+}
+
+.melody-btn:active {
+  transform: translateY(0);
+}
+
+.melody-btn:focus-visible {
+  outline: 2px solid var(--note-current);
+  outline-offset: 2px;
+}
+
+.melody-btn.played {
+  border-color: color-mix(in srgb, var(--note-past) 70%, transparent);
+  color: var(--note-past);
+}
+
+.melody-name {
+  font-family: "DM Serif Display", Georgia, serif;
+  font-size: 1.05rem;
+  line-height: 1.15;
+  text-align: center;
+  /* Long titles wrap rather than widening their column: the buttons share a
+     grid, so one of them stretching would stretch the whole row. */
+  overflow-wrap: anywhere;
+}
+
+.melody-composer {
+  font-size: 0.72rem;
+  text-align: center;
+  color: var(--status-label);
+}
+
 .results-stats {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1622,7 +1844,9 @@ body {
   .key-option.correct,
   .interval-option.wrong,
   .interval-quality.wrong,
-  .interval-qualities.nudge {
+  .interval-qualities.nudge,
+  .listening-option.wrong,
+  .listening-option.correct {
     animation: none;
   }
 }
